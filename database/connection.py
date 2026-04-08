@@ -8,19 +8,17 @@ def init_db():
         firebase_admin.get_app()
     except ValueError:
         # Tenta carregar dos Secrets do Streamlit (Nuvem) ou Arquivo Local
-        if "firebase" in st.secrets:
-            # Reconstrói o dicionário de forma explícita para evitar erros de tipo do AttrDict
+        if "firebase_json" in st.secrets:
+            # Método Infalível: Lê o JSON bruto do segredo e converte em dicionário
+            import json
+            fb_creds = json.loads(st.secrets["firebase_json"], strict=False)
+            cred = credentials.Certificate(fb_creds)
+        elif "firebase" in st.secrets:
+            # Fallback para o modelo campo-a-campo (caso prefira manter o antigo)
             fb_creds = {k: v for k, v in st.secrets["firebase"].items()}
-            
-            # Limpeza cirúrgica da chave privada (o ponto mais comum de erro no Streamlit Cloud)
             if "private_key" in fb_creds:
-                # Remove possíveis aspas extras e garante conversão correta de \n
                 raw_key = fb_creds["private_key"].strip().strip('"')
-                if "\\n" in raw_key:
-                    fb_creds["private_key"] = raw_key.replace("\\n", "\n")
-                else:
-                    fb_creds["private_key"] = raw_key
-                    
+                fb_creds["private_key"] = raw_key.replace("\\n", "\n") if "\\n" in raw_key else raw_key
             cred = credentials.Certificate(fb_creds)
         else:
             # Fallback para desenvolvimento local
