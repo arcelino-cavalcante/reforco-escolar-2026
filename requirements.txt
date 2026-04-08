@@ -1,0 +1,7 @@
+streamlit
+streamlit-option-menu
+firebase-admin
+pandas
+plotly
+openai
+httpx

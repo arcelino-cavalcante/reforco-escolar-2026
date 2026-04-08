@@ -1,0 +1,137 @@
+import streamlit as st
+import pandas as pd
+import datetime
+from database.crud import (
+    listar_turmas, listar_estudantes,
+    listar_registros_por_estudante, listar_consolidados_por_estudante
+)
+from utils.styles import page_header
+
+def render():
+    page_header("🧑‍🎓 Dossiê do Estudante", "Prontuário completo, contínuo e analítico do aluno no apoio ao Reforço.")
+
+    turmas = listar_turmas()
+    if not turmas:
+        st.warning("Nenhuma turma cadastrada no sistema.")
+        return
+
+    # 1. Filtros em Cascata
+    st.subheader("1. Selecione o(a) Estudante")
+    
+    c_t, c_e = st.columns(2)
+    with c_t:
+        turma_opcoes = {f"{t['nome']} ({t['etapa_nome']})": t['id'] for t in turmas}
+        turma_sel_nome = st.selectbox("Selecione a Turma:", list(turma_opcoes.keys()))
+        turma_id_sel = turma_opcoes[turma_sel_nome]
+
+    with c_e:
+        todos_estudantes = listar_estudantes()
+        # Filtra os estudantes da turma selecionada
+        estudantes_turma = [e for e in todos_estudantes if e.get('turma_id') == turma_id_sel]
+        
+        if not estudantes_turma:
+            st.warning("Nenhum estudante cadastrado nesta turma.")
+            return
+            
+        est_opcoes = {e['nome']: e['id'] for e in estudantes_turma}
+        aluno_sel_nome = st.selectbox("Selecione o Estudante:", list(est_opcoes.keys()))
+        aluno_id_sel = est_opcoes[aluno_sel_nome]
+
+    st.divider()
+
+    # 2. Resgatar todos os históricos do Firebase
+    historico_diario = listar_registros_por_estudante(aluno_id_sel)
+    historico_mensal = listar_consolidados_por_estudante(aluno_id_sel)
+
+    if not historico_diario and not historico_mensal:
+        st.info("Nenhum registro de participação em reforço escolar localizado para este(a) estudante.")
+        return
+
+    # 3. Painel de Métricas (Dashboard Individual)
+    st.subheader(f"📊 Panorama Geral: {aluno_sel_nome}")
+
+    df_d = pd.DataFrame(historico_diario)
+    
+    if not df_d.empty:
+        total_lancamentos = len(df_d)
+        presentes = len(df_d[df_d['compareceu'] == 1])
+        faltas = total_lancamentos - presentes
+        
+        taxa_presenca = (presentes / total_lancamentos) * 100 if total_lancamentos > 0 else 0
+        
+        aulas_mat = len(df_d[(df_d['compareceu'] == 1) & (df_d['prof_area'] == 'Matemática')])
+        aulas_port = len(df_d[(df_d['compareceu'] == 1) & (df_d['prof_area'] == 'Português')])
+
+        # Calcular nível de Autonomia Pessoal
+        def calc_autonomia(val):
+            if isinstance(val, str) and "Autônomo" in val: return 1
+            if isinstance(val, (int, float)) and val >= 8: return 1
+            return 0
+            
+        df_pres = df_d[df_d['compareceu'] == 1].copy()
+        if not df_pres.empty and 'nivel_compreensao' in df_pres.columns:
+            df_pres['is_autonomo'] = df_pres['nivel_compreensao'].apply(calc_autonomia)
+            taxa_autonomia = (df_pres['is_autonomo'].sum() / len(df_pres)) * 100
+        else:
+            taxa_autonomia = 0
+
+        # Renderizando as colunas do Dashboard
+        ca, cb, cc, cd = st.columns(4)
+        ca.metric("Total Lançamentos (Dias)", total_lancamentos)
+        cb.metric("Taxa de Comparecimento", f"{taxa_presenca:.1f}%", help=f"Presenças: {presentes} / Faltas: {faltas}")
+        cc.metric("Sessões (Mat/Port)", f"{aulas_mat} / {aulas_port}")
+        
+        # Colorir a métrica de autonomia baseado no estado
+        cd.metric("Autonomia Total do Aluno", f"{taxa_autonomia:.1f}%")
+        
+        st.write("<br>", unsafe_allow_html=True)
+        
+    # 4. Conselho de Alta (Listar Fechamentos Mensais em Destaque)
+    if historico_mensal:
+        st.subheader("📋 Relatórios de Conselho Bimestral (Desfechos)")
+        for cons in historico_mensal:
+            if cons.get('recomendacao_alta'):
+                st.success(f"🎓 **URGENTE: ALTA SUGERIDA (Bim {cons.get('bimestre')})**  \nOs professores de reforço indicam que este aluno atingiu autonomia suficiente!")
+            else:
+                st.info(f"**Fechamento Bimestral ({cons.get('bimestre')}):** {cons.get('parecer_evolutivo', 'Em processo')}")
+            
+            if cons.get('acao_pedagogica'):
+                st.warning(f"📌 **Ação Pedagógica Sugerida ao Regente:** {cons.get('acao_pedagogica')}")
+                
+            if cons.get('observacao_geral'):
+                st.write(f"*Obs. Privada do Reforço:* {cons.get('observacao_geral')}")
+            st.divider()
+
+    # 5. Timeline Vertical (Logs Diários)
+    if not df_d.empty:
+        st.subheader("📆 Timeline Contínua (Lançamentos de Reforço)")
+        
+        for reg in historico_diario:
+            data_f = datetime.datetime.strptime(reg['data_registro'], '%Y-%m-%d').strftime('%d/%m/%Y')
+            area = reg.get('prof_area', 'Revisão')
+            prof_nome = reg.get('prof_nome', 'Equipe')
+            
+            # Caixa estilizada baseada na presença
+            with st.container(border=True):
+                if reg['compareceu'] == 1:
+                    st.markdown(f"🗓️ **{data_f}** | Bimestre: {reg.get('bimestre')} | **🟢 PREENTE**")
+                    st.markdown(f"**Área:** {area} (`Professor(a): {prof_nome}`)")
+                    st.markdown(f"**Habilidade Trabalhada:** {reg.get('habilidade_trabalhada')}")
+                    
+                    # Nivel de compreensao text formatado ou numero legado
+                    nv = reg.get('nivel_compreensao')
+                    if isinstance(nv, (int, float)):
+                        st.markdown(f"**Compreensão alcançada:** Recebeu Nota {nv}/10 ({reg.get('participacao')})")
+                    else:
+                        st.markdown(f"**Compreensão alcançada:** *{nv}* ({reg.get('participacao')})")
+                    
+                    if reg.get('dificuldade_latente'):
+                        st.markdown(f"**⚠️ Gargalo Latente Mapeado:** <span style='color:red;'>{reg.get('dificuldade_latente')}</span>", unsafe_allow_html=True)
+                        
+                    if reg.get('observacao'):
+                        st.markdown(f"**Observação:** *{reg.get('observacao')}*")
+                else:
+                    st.markdown(f"🗓️ **{data_f}** | Bimestre: {reg.get('bimestre')} | **🔴 FALTOU**")
+                    st.markdown(f"`Professor(a): {prof_nome}`")
+                    st.markdown(f"**Motivo Alegado:** {reg.get('motivo_falta')}")
+            st.write("<br>", unsafe_allow_html=True)

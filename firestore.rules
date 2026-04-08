@@ -1,0 +1,13 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // BLOQUEIO TOTAL PARA A INTERNET PÚBLICA / HACKERS
+    // Apenas a Service Account do Servidor Python (Streamlit) tem a chave mestra para ler/escrever.
+    match /{document=**} {
+      allow read, write: if false; 
+    }
+    
+  }
+}
