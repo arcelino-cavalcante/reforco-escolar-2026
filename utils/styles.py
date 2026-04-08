@@ -6,19 +6,26 @@ def aplicar_estilos():
         <style>
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
-            .stDeployButton {display:none;}
+            .stDeployButton {display:none !important;}
             
-            /* Ajuste de Header para Celular: Esconde a barra mas mantém o botão de Menu */
+            /* Remove marca d'água e botão de deploy, mas mantém o Header funcional */
             [data-testid="stHeader"] {
                 background-color: rgba(255, 255, 255, 0);
             }
-            [data-testid="stHeader"] > div:first-child {
-                visibility: hidden;
-            }
+            
+            /* Garante que o botão de abrir/fechar o menu continue visível e usável */
             [data-testid="stHeader"] [data-testid="stSidebarCollapseButton"] {
-                visibility: visible;
+                visibility: visible !important;
+                display: flex !important;
                 background-color: #f0f2f6;
-                border-radius: 50%;
+                border-radius: 8px;
+            }
+
+            /* No mobile, o botão do menu lateral fica no topo esquerdo */
+            @media (max-width: 768px) {
+                [data-testid="stHeader"] [data-testid="stSidebarCollapseButton"] {
+                    margin-left: 10px;
+                }
             }
 
             /* Remove espaço extra no topo */
