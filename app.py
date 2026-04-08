@@ -9,7 +9,7 @@ st.set_page_config(
     page_title="Reforço Escolar",
     page_icon="📚",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="auto"
 )
 
 # ===== INICIALIZAR BANCO DE DADOS =====
@@ -45,11 +45,25 @@ if st.session_state.perfil is None:
             st.session_state.modo_login = "login_regente"
             st.rerun()
     with col4:
+        if "pedir_senha_coord" not in st.session_state:
+            st.session_state.pedir_senha_coord = False
+
         if st.button("📋 Coordenação", use_container_width=True, type="secondary"):
-            st.session_state.perfil = "coordenacao"
-            st.rerun()
+            st.session_state.pedir_senha_coord = True
 
     st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Campo de Senha para Coordenação
+    if st.session_state.pedir_senha_coord:
+        _, pw_col, _ = st.columns([1, 2, 1])
+        with pw_col:
+            senha = st.text_input("Digite a senha de acesso:", type="password")
+            if senha == "123456":
+                st.session_state.perfil = "coordenacao"
+                st.session_state.pedir_senha_coord = False
+                st.rerun()
+            elif senha != "":
+                st.error("Senha incorreta!")
     
     # Exibir dropdowns de login se selecionou um modo de professor
     if st.session_state.modo_login == "login_reforco":

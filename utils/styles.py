@@ -6,9 +6,21 @@ def aplicar_estilos():
         <style>
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
-            header {visibility: hidden;}
             .stDeployButton {display:none;}
             
+            /* Ajuste de Header para Celular: Esconde a barra mas mantém o botão de Menu */
+            [data-testid="stHeader"] {
+                background-color: rgba(255, 255, 255, 0);
+            }
+            [data-testid="stHeader"] > div:first-child {
+                visibility: hidden;
+            }
+            [data-testid="stHeader"] [data-testid="stSidebarCollapseButton"] {
+                visibility: visible;
+                background-color: #f0f2f6;
+                border-radius: 50%;
+            }
+
             /* Remove espaço extra no topo */
             .block-container {
                 padding-top: 2rem;
