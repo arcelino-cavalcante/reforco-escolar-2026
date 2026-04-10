@@ -64,13 +64,33 @@ def _docs_to_list(docs):
 def _clear_cache():
     st.cache_data.clear()
 
-# ==========================================
-# ETAPAS
-# ==========================================
+def garantir_etapas_padrao():
+    """Garante que as etapas básicas existam no banco de dados."""
+    db = get_db()
+    etapas_ref = db.collection('etapas')
+    existentes = _docs_to_list(etapas_ref.get())
+    
+    padroes = ["EDUCAÇÃO INFANTIL", "ANOS INICIAIS", "ANOS FINAIS", "EJA"]
+    nomes_existentes = [e.get('nome') for e in existentes]
+    
+    for nome in padroes:
+        if nome not in nomes_existentes:
+            etapas_ref.add({'nome': nome})
+    
+    # Se houve inserção, o cache deve ser limpo na próxima listagem (o ttl já ajuda, mas forçamos se necessário)
+
 @st.cache_data(ttl=15)
 def listar_etapas():
+    garantir_etapas_padrao()
     db = get_db()
     return _docs_to_list(db.collection('etapas').get())
+
+def criar_etapa(nome):
+    db = get_db()
+    ref = db.collection('etapas').document()
+    ref.set({'nome': nome})
+    _clear_cache()
+    return ref.id
 
 # ==========================================
 # TURMAS
