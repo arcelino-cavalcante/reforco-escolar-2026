@@ -30,38 +30,50 @@ if 'prof_nome' not in st.session_state:
 
 # ===== TELA DE LOGIN =====
 if st.session_state.perfil is None:
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    st.markdown("<h1 style='text-align: center; color: #2C3E50;'>Portal Educacional de Reforço</h1>", unsafe_allow_html=True)
-    st.markdown("<h4 style='text-align: center; color: #7F8C8D; margin-bottom: 40px;'>Selecione o seu perfil de acesso</h4>", unsafe_allow_html=True)
+    # CSS responsivo para ajustar tamanhos no mobile vs desktop
+    resp_css = """
+    <style>
+    .title-main { text-align: center; color: #2C3E50; font-size: 2.5rem; font-weight: bold; margin-top: 20px; }
+    .subtitle-main { text-align: center; color: #7F8C8D; font-size: 1.2rem; margin-bottom: 30px; }
+    .emoji-icon { text-align: center; font-size: 3rem; margin-bottom: 10px; line-height: 1; }
     
-    _, center_col, _ = st.columns([1, 4, 1])
+    @media (max-width: 768px) {
+        .title-main { font-size: 1.6rem !important; margin-top: 5px !important; }
+        .subtitle-main { font-size: 1rem !important; margin-bottom: 15px !important; }
+        .emoji-icon { font-size: 2rem !important; margin-bottom: 5px !important; }
+        /* Reduz padding das bordas do container padrão no web no mobile */
+        [data-testid="stVerticalBlockBorderWrapper"] { padding: 0.5rem !important; }
+    }
+    </style>
+    <div class="title-main">Portal Educacional de Reforço</div>
+    <div class="subtitle-main">Selecione o seu perfil de acesso</div>
+    """
+    st.markdown(resp_css, unsafe_allow_html=True)
     
-    with center_col:
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            with st.container(border=True):
-                st.markdown("<div style='text-align: center; font-size: 3.5rem; margin-bottom:10px;'>👨‍🏫</div>", unsafe_allow_html=True)
-                if st.button("Prof. de Reforço", use_container_width=True, type="primary"):
-                    st.session_state.modo_login = "login_reforco"
-                    if "pedir_senha_coord" in st.session_state: st.session_state.pedir_senha_coord = False
-        with c2:
-            with st.container(border=True):
-                st.markdown("<div style='text-align: center; font-size: 3.5rem; margin-bottom:10px;'>👩‍🏫</div>", unsafe_allow_html=True)
-                if st.button("Prof. Regente", use_container_width=True, type="primary"):
-                    st.session_state.modo_login = "login_regente"
-                    if "pedir_senha_coord" in st.session_state: st.session_state.pedir_senha_coord = False
-        with c3:
-            with st.container(border=True):
-                st.markdown("<div style='text-align: center; font-size: 3.5rem; margin-bottom:10px;'>📋</div>", unsafe_allow_html=True)
-                if st.button("Coordenação", use_container_width=True):
-                    st.session_state.pedir_senha_coord = True
-                    st.session_state.modo_login = None
+    c1, c2, c3 = st.columns(3)
+    
+    with c1:
+        with st.container(border=True):
+            st.markdown("<div class='emoji-icon'>👨‍🏫</div>", unsafe_allow_html=True)
+            if st.button("Prof. de Reforço", use_container_width=True, type="primary"):
+                st.session_state.modo_login = "login_reforco"
+                if "pedir_senha_coord" in st.session_state: st.session_state.pedir_senha_coord = False
+    with c2:
+        with st.container(border=True):
+            st.markdown("<div class='emoji-icon'>👩‍🏫</div>", unsafe_allow_html=True)
+            if st.button("Prof. Regente", use_container_width=True, type="primary"):
+                st.session_state.modo_login = "login_regente"
+                if "pedir_senha_coord" in st.session_state: st.session_state.pedir_senha_coord = False
+    with c3:
+        with st.container(border=True):
+            st.markdown("<div class='emoji-icon'>📋</div>", unsafe_allow_html=True)
+            if st.button("Coordenação", use_container_width=True):
+                st.session_state.pedir_senha_coord = True
+                st.session_state.modo_login = None
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    # Campo de Senha para Coordenação
     if st.session_state.get("pedir_senha_coord", False):
-        _, pw_col, _ = st.columns([2, 3, 2])
+        st.markdown("<br>", unsafe_allow_html=True)
+        _, pw_col, _ = st.columns([1, 6, 1])
         with pw_col:
             with st.form("form_coord"):
                 st.info("🔐 Área restrita à Coordenação Pedagógica")
@@ -82,7 +94,8 @@ if st.session_state.perfil is None:
     
     # Exibir dropdowns de login se selecionou um modo de professor
     elif st.session_state.modo_login in ["login_reforco", "login_regente"]:
-        _, col_login, _ = st.columns([2, 3, 2])
+        st.markdown("<br>", unsafe_allow_html=True)
+        _, col_login, _ = st.columns([1, 6, 1])
         with col_login:
             with st.container(border=True):
                 if st.session_state.modo_login == "login_reforco":
