@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from database.crud import listar_todos_registros_diarios
+from database.crud import listar_todos_registros_diarios, compreensao_para_nota
 from utils.styles import page_header
 
 def render():
@@ -66,9 +66,7 @@ def render():
     df_faltou = df_filtrado[df_filtrado['compareceu'] == 0]
     
     def calc_autonomia(val):
-        if isinstance(val, str) and "Autônomo" in val: return 1
-        if isinstance(val, (int, float)) and val >= 8: return 1
-        return 0
+        return 1 if compreensao_para_nota(val) == 4 else 0
         
     taxa_presenca = (len(df_compareceu) / total_registros * 100) if total_registros > 0 else 0
     
@@ -122,6 +120,40 @@ def render():
             st.success("Não houveram faltas registradas nestes filtros! 🎉")
 
     st.write("<br>", unsafe_allow_html=True)
+    
+    col_g3, col_g4 = st.columns(2)
+    with col_g3:
+        st.write("##### Tipos de Atividades")
+        if not df_compareceu.empty and 'tipo_atividade' in df_compareceu.columns:
+            df_tipo = df_compareceu.dropna(subset=['tipo_atividade'])
+            if not df_tipo.empty:
+                tipo_counts = df_tipo['tipo_atividade'].value_counts().reset_index()
+                tipo_counts.columns = ['Atividade', 'Contagem']
+                fig_tipo = px.pie(tipo_counts, values='Contagem', names='Atividade', hole=0.4, 
+                                  color_discrete_sequence=px.colors.sequential.Purp)
+                st.plotly_chart(fig_tipo, use_container_width=True)
+            else:
+                st.info("Nenhum dado legível de atividade.")
+        else:
+            st.info("Sem dados de atividade.")
+            
+    with col_g4:
+        st.write("##### Estados Emocionais")
+        if not df_compareceu.empty and 'estado_emocional' in df_compareceu.columns:
+            df_emoc = df_compareceu[df_compareceu['estado_emocional'] != 'Não Observado'].dropna(subset=['estado_emocional'])
+            if not df_emoc.empty:
+                emoc_counts = df_emoc['estado_emocional'].value_counts().reset_index()
+                emoc_counts.columns = ['Estado', 'Contagem']
+                fig_emoc = px.bar(emoc_counts, x='Contagem', y='Estado', orientation='h',
+                                   color='Estado',
+                                   color_discrete_sequence=px.colors.qualitative.Set3)
+                st.plotly_chart(fig_emoc, use_container_width=True)
+            else:
+                st.info("Nenhuma observação emocional registrada.")
+        else:
+            st.info("Sem dados emocionais.")
+
+    st.write("<br>", unsafe_allow_html=True)
 
     # ===== HABILIDADES E COMPREENSÃO GERAL ======
     st.subheader("🎯 Destaques de Habilidades e Conteúdos")
@@ -164,4 +196,7 @@ def render():
             
     # Tabela final de dados filtrados
     with st.expander("Tabela Completa de Dados Filtrados"):
-        st.dataframe(df_filtrado[['data_registro', 'estudante_nome', 'turma_nome', 'prof_nome', 'prof_area', 'compareceu', 'habilidade_trabalhada', 'nivel_compreensao', 'participacao']], use_container_width=True)
+        cols_mostrar = ['data_registro', 'estudante_nome', 'turma_nome', 'prof_nome', 'prof_area', 'compareceu', 'habilidade_trabalhada', 'nivel_compreensao', 'participacao']
+        if 'tipo_atividade' in df_filtrado.columns: cols_mostrar.append('tipo_atividade')
+        if 'estado_emocional' in df_filtrado.columns: cols_mostrar.append('estado_emocional')
+        st.dataframe(df_filtrado[cols_mostrar], use_container_width=True)

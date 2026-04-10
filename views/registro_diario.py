@@ -9,6 +9,13 @@ from database.crud import (
 )
 from utils.styles import page_header
 
+HABILIDADES_MATEMATICA = ["Adição e Subtração", "Multiplicação e Divisão", "Frações e Decimais", "Resolução de Problemas", "Geometria", "Estatística Básica / Gráficos", "Sistema Monetário", "Outro"]
+HABILIDADES_PORTUGUES = ["Leitura e Compreensão Textual", "Produção de Texto (Escrita)", "Ortografia e Gramática", "Fluência Leitora", "Caligrafia e Traçado", "Interpretação Avançada", "Vocabulário", "Outro"]
+MOTIVOS_FALTA = ["Atestado Médico / Doença", "Problema de Transporte", "Falta do Professor (Sua falta)", "Feriado / Recesso", "Esqueceu do Reforço", "Evento na Escola", "Outro Motivo"]
+NIVEIS_ENGAJAMENTO = ["Muito Focado e Participativo", "Participação Regular", "Desatento / Disperso", "Agitado / Inquieto", "Recusou-se a Realizar Tarefas"]
+TIPOS_ATIVIDADE = ["Exercício no Caderno / Apostila", "Atividade Lúdica / Jogo", "Leitura Orientada", "Atividade em Grupo", "Uso de Tecnologia / Computador", "Avaliação / Teste", "Outro"]
+ESTADOS_EMOCIONAIS = ["Não Observado", "Tranquilo / Calmo", "Triste / Apático", "Irritado / Frustrado", "Ansioso", "Eufórico / Muito Agitado"]
+
 def render():
     page_header("📝 Ficha Diária", "Acompanhe e cruze dados vitais de Reforço x Sala de Aula.")
 
@@ -90,16 +97,18 @@ def render():
                 nivel_comp = 0
                 participacao = None
                 observacao = None
+                tipo_atividade = None
+                estado_emocional = None
                 
                 if compareceu == "Não":
-                    motivo_falta = st.selectbox("Motivo da Ausência:", ["Sua falta", "Falta da escola", "Outro Motivo"])
+                    motivo_falta = st.selectbox("Motivo da Ausência:", MOTIVOS_FALTA)
                 else:
                     origem_conteudo = st.selectbox("O que foi trabalhado no dia?", ["Conteúdo base do Reforço", "Conteúdo da Sala de Aula"])
                     
                     if area_prof == "Matemática":
-                        hab_opcoes = ["Adição e Subtração", "Multiplicação e Divisão", "Frações e Decimais", "Resolução de Problemas", "Geometria", "Outro"]
+                        hab_opcoes = HABILIDADES_MATEMATICA
                     elif area_prof == "Português":
-                        hab_opcoes = ["Leitura e Compreensão Textual", "Produção de Texto (Escrita)", "Ortografia e Gramática", "Fluência Leitora", "Outro"]
+                        hab_opcoes = HABILIDADES_PORTUGUES
                     else:
                         hab_opcoes = ["Geral", "Outro"]
                         
@@ -108,6 +117,12 @@ def render():
                         hab_conteudo = st.text_input("Especifique a Habilidade *")
                     else:
                         hab_conteudo = hab_sel
+                    
+                    c_t, c_e = st.columns(2)
+                    with c_t:
+                        tipo_atividade = st.selectbox("Tipo de Atividade:", TIPOS_ATIVIDADE)
+                    with c_e:
+                        estado_emocional = st.selectbox("Estado Emocional (Opcional):", ESTADOS_EMOCIONAIS)
                     
                     c_n1, c_n2 = st.columns(2)
                     with c_n1:
@@ -118,7 +133,7 @@ def render():
                             "Autônomo (Domínio total)"
                         ])
                     with c_n2:
-                        participacao = st.selectbox("Nível de Atenção/Foco:", ["Desatento", "Normal", "Muito Focado"])
+                        participacao = st.selectbox("Engajamento/Comportamento:", NIVEIS_ENGAJAMENTO)
                         
                     dificuldade_latente = None
                     if nivel_comp != "Autônomo (Domínio total)":
@@ -143,7 +158,9 @@ def render():
                             nivel_compreensao=nivel_comp,
                             participacao=participacao,
                             observacao=observacao.strip() if observacao else None,
-                            dificuldade_latente=dificuldade_latente.strip() if dificuldade_latente else None
+                            dificuldade_latente=dificuldade_latente.strip() if dificuldade_latente else None,
+                            tipo_atividade=tipo_atividade,
+                            estado_emocional=estado_emocional if estado_emocional != "Não Observado" else None
                         )
                         st.rerun()
 
@@ -213,18 +230,21 @@ def render():
                     e_niv = 0
                     e_part = None
                     e_obs = None
+                    e_tipo = None
+                    e_emoc = None
                     
                     if e_comp == "Não":
-                        idx_mot = ["Sua falta", "Falta da escola", "Outro Motivo"].index(reg['motivo_falta']) if reg['motivo_falta'] in ["Sua falta", "Falta da escola", "Outro Motivo"] else 0
-                        e_m = st.selectbox("Motivo?", ["Sua falta", "Falta da escola", "Outro Motivo"], index=idx_mot, key=f"m_{reg['id']}")
+                        val_mot = reg.get('motivo_falta')
+                        idx_mot = MOTIVOS_FALTA.index(val_mot) if val_mot in MOTIVOS_FALTA else (len(MOTIVOS_FALTA)-1 if val_mot else 0)
+                        e_m = st.selectbox("Motivo?", MOTIVOS_FALTA, index=idx_mot, key=f"m_{reg['id']}")
                     else:
                         idx_ori = ["Conteúdo base do Reforço", "Conteúdo da Sala de Aula"].index(reg['origem_conteudo']) if reg['origem_conteudo'] in ["Conteúdo base do Reforço", "Conteúdo da Sala de Aula"] else 0
                         e_ori = st.selectbox("Origem?", ["Conteúdo base do Reforço", "Conteúdo da Sala de Aula"], index=idx_ori, key=f"o_{reg['id']}")
                         
                         if area_prof == "Matemática":
-                            hab_opcoes_e = ["Adição e Subtração", "Multiplicação e Divisão", "Frações e Decimais", "Resolução de Problemas", "Geometria", "Outro"]
+                            hab_opcoes_e = HABILIDADES_MATEMATICA
                         elif area_prof == "Português":
-                            hab_opcoes_e = ["Leitura e Compreensão Textual", "Produção de Texto (Escrita)", "Ortografia e Gramática", "Fluência Leitora", "Outro"]
+                            hab_opcoes_e = HABILIDADES_PORTUGUES
                         else:
                             hab_opcoes_e = ["Geral", "Outro"]
                         
@@ -236,6 +256,16 @@ def render():
                             e_hab = st.text_input("Especifique:", value=h_atual if h_atual not in hab_opcoes_e else "", key=f"htxt_{reg['id']}")
                         else:
                             e_hab = h_sel_e
+                            
+                        c_te, c_ee = st.columns(2)
+                        with c_te:
+                            val_tipo = reg.get('tipo_atividade') or TIPOS_ATIVIDADE[0]
+                            idx_tipo = TIPOS_ATIVIDADE.index(val_tipo) if val_tipo in TIPOS_ATIVIDADE else 0
+                            e_tipo = st.selectbox("Tipo de Atividade:", TIPOS_ATIVIDADE, index=idx_tipo, key=f"tipo_{reg['id']}")
+                        with c_ee:
+                            val_emoc = reg.get('estado_emocional') or "Não Observado"
+                            idx_emoc = ESTADOS_EMOCIONAIS.index(val_emoc) if val_emoc in ESTADOS_EMOCIONAIS else 0
+                            e_emoc = st.selectbox("Estado Emocional:", ESTADOS_EMOCIONAIS, index=idx_emoc, key=f"emoc_{reg['id']}")
                         
                         cc1, cc2 = st.columns(2)
                         with cc1:
@@ -244,10 +274,9 @@ def render():
                             idx_niv = opcoes_comp.index(val_niv) if val_niv in opcoes_comp else 0
                             e_niv = st.selectbox("Compreensão", opcoes_comp, index=idx_niv, key=f"niv_{reg['id']}")
                         with cc2:
-                            val_part = reg.get('participacao') or "Normal"
-                            op_part = ["Desatento", "Normal", "Muito Focado"]
-                            idx_part = op_part.index(val_part) if val_part in op_part else 1
-                            e_part = st.selectbox("Atenção:", op_part, index=idx_part, key=f"part_{reg['id']}")
+                            val_part = reg.get('participacao') or NIVEIS_ENGAJAMENTO[1]
+                            idx_part = NIVEIS_ENGAJAMENTO.index(val_part) if val_part in NIVEIS_ENGAJAMENTO else 1
+                            e_part = st.selectbox("Atenção:", NIVEIS_ENGAJAMENTO, index=idx_part, key=f"part_{reg['id']}")
                             
                         e_dif = None
                         if e_niv != "Autônomo (Domínio total)":
@@ -271,7 +300,9 @@ def render():
                                 nivel_compreensao=e_niv,
                                 participacao=e_part,
                                 observacao=e_obs.strip() if e_obs else None,
-                                dificuldade_latente=e_dif.strip() if e_dif else None
+                                dificuldade_latente=e_dif.strip() if e_dif else None,
+                                tipo_atividade=e_tipo,
+                                estado_emocional=e_emoc if e_emoc != "Não Observado" else None
                             )
                             st.session_state.editando_rd = None
                             st.rerun()

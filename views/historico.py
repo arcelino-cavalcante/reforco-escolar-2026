@@ -4,7 +4,8 @@ from database.crud import (
     listar_registros_diarios_trinta_dias, 
     listar_consolidados_por_prof_reforco,
     obter_turmas_prof_reforco,
-    listar_turmas
+    listar_turmas,
+    compreensao_label, compreensao_emoji
 )
 from utils.styles import page_header
 
@@ -51,7 +52,19 @@ def render():
                                 with col_info:
                                     st.write(f"**{r['estudante_nome']}**")
                                     if r['compareceu'] == 1:
-                                        st.caption(f"Habilidade: {r['habilidade_trabalhada']} | Compreensão: {r['nivel_compreensao']}/10")
+                                        nv_raw = r['nivel_compreensao']
+                                        nv_label = compreensao_label(nv_raw)
+                                        nv_emoji = compreensao_emoji(nv_raw)
+                                        st.caption(f"Habilidade: {r['habilidade_trabalhada']} | Compreensão: {nv_emoji} {nv_label}")
+                                        
+                                        info_extra = []
+                                        if r.get('tipo_atividade'): info_extra.append(f"Ativ: {r.get('tipo_atividade')}")
+                                        if r.get('participacao'): info_extra.append(f"Foco: {r.get('participacao')}")
+                                        if r.get('estado_emocional') and r.get('estado_emocional') != "Não Observado": info_extra.append(f"Emocional: {r.get('estado_emocional')}")
+                                        
+                                        if info_extra:
+                                            st.caption(" | ".join(info_extra))
+                                            
                                         if r['observacao']:
                                             st.markdown(f"*Obs: {r['observacao']}*")
                                     else:

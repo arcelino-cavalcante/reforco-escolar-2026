@@ -25,7 +25,20 @@ def render():
             st.metric("Alunos Atendidos (Últimos 7 dias)", stats['qtd_atendidos_semana'])
             
         st.divider()
-        st.caption("Foque nos atendimentos pendentes para bater as metas de frequência.")
+        st.subheader("📊 Meu Desempenho Visual")
+        import plotly.express as px
+        
+        c_g1, c_g2 = st.columns(2)
+        with c_g1:
+            atendidos = stats['qtd_atendidos_semana']
+            pendentes = stats['qtd_total_estudantes'] - atendidos
+            if pendentes < 0: pendentes = 0
+            if stats['qtd_total_estudantes'] > 0:
+                df_g = pd.DataFrame({'Status': ['Atendidos na Semana', 'Pendentes'], 'Contagem': [atendidos, pendentes]})
+                fig = px.pie(df_g, names='Status', values='Contagem', hole=0.5, color_discrete_sequence=['#2ecc71', '#e74c3c'])
+                st.plotly_chart(fig, use_container_width=True)
+        with c_g2:
+            st.caption("Foque nos atendimentos pendentes para bater as metas de frequência.")
         return
 
     # ===== DASHBOARD PARA COORDENAÇÃO OU GERAL =====
@@ -61,8 +74,22 @@ def render():
     if not dados_etapas:
         st.info("Nenhum registro de etapa encontrado.")
     else:
-        # Exibe os números por etapa lado a lado
         cols_etp = st.columns(len(dados_etapas))
         for i, item in enumerate(dados_etapas):
             with cols_etp[i]:
                 st.metric(item['etapa_nome'], item['contagem'])
+
+        st.write("<br>", unsafe_allow_html=True)
+        st.subheader("📈 Análise Gráfica Global")
+        c_g1, c_g2 = st.columns(2)
+        
+        import plotly.express as px
+        with c_g1:
+            df_etp = pd.DataFrame(dados_etapas)
+            fig_etp = px.bar(df_etp, x='etapa_nome', y='contagem', color='etapa_nome', title="Distribuição por Etapa", text_auto=True)
+            st.plotly_chart(fig_etp, use_container_width=True)
+            
+        with c_g2:
+            df_prof = pd.DataFrame({'Cargo': ['Equipe de Reforço', 'Professores Regentes'], 'Quantidade': [stats['qtd_prof_reforco'], stats['qtd_prof_regente']]})
+            fig_prof = px.pie(df_prof, names='Cargo', values='Quantidade', hole=0.4, title="Corpo Docente Ativo", color_discrete_sequence=['#3498db', '#9b59b6'])
+            st.plotly_chart(fig_prof, use_container_width=True)

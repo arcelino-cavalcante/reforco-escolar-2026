@@ -15,12 +15,14 @@ def build_data_context_text():
         est_lines.append(f"{e['nome']},{e['turma_nome']},{e['etapa_nome']}")
     estudantes_csv = "\n".join(est_lines)
     
-    dia_lines = ["\nREGISTROS (Últimos 30 dias): Data,Aluno,Prof,Area,Presenca,Habilidade_Falta,Compreensao"]
+    dia_lines = ["\nREGISTROS (Últimos 30 dias): Data,Aluno,Prof,Area,Presenca,Habilidade_Falta,Compreensao,Atividade,Emocional"]
     for r in diarios:
         hab_falta = r['habilidade_trabalhada'] if r['compareceu'] == 1 else (r['motivo_falta'] or 'Falta')
         comp = r.get('nivel_compreensao', 0) if r['compareceu'] == 1 else "-"
+        ativ = r.get('tipo_atividade') or "-"
+        emoc = r.get('estado_emocional') or "-"
         # Removido espaços excessivos propositalmente
-        dia_lines.append(f"{r['data_registro']},{r['estudante_nome']},{r['prof_nome']},{r['prof_area']},{'Sim' if r['compareceu']==1 else 'Nao'},{hab_falta},{comp}")
+        dia_lines.append(f"{r['data_registro']},{r['estudante_nome']},{r['prof_nome']},{r['prof_area']},{'Sim' if r['compareceu']==1 else 'Nao'},{hab_falta},{comp},{ativ},{emoc}")
     diarios_csv = "\n".join(dia_lines)
     
     return estudantes_csv + "\n" + diarios_csv
@@ -48,8 +50,11 @@ def render():
 
     # 1. Obter a chave (Prioridade: Secrets do Streamlit Cloud)
     api_key_input = ""
-    if "openai" in st.secrets:
-        api_key_input = st.secrets["openai"].get("api_key", "")
+    try:
+        if "openai" in st.secrets:
+            api_key_input = st.secrets["openai"].get("api_key", "")
+    except Exception:
+        pass  # Sem secrets.toml — modo local
     
     if not api_key_input:
         # Tenta campo manual apenas se não houver segredo
@@ -91,8 +96,21 @@ def render():
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
 
-    # 3. Caixa de Entrada do Usuário
-    if prompt := st.chat_input("O que você deseja analisar sobre os alunos?"):
+    # Sugestões de Perguntas
+    st.write("💡 **Perguntas Sugeridas:**")
+    c1, c2, c3 = st.columns(3)
+    sug_1 = c1.button("Quais habilidades mais trabalhadas?", use_container_width=True)
+    sug_2 = c2.button("Resumo de Faltas (Alunos e Motivos)", use_container_width=True)
+    sug_3 = c3.button("Alunos Próximos de ter Alta", use_container_width=True)
+    
+    prompt = st.chat_input("O que você deseja analisar sobre os alunos?")
+    
+    if sug_1: prompt = "Liste as habilidades mais trabalhadas e cite os gargalos comuns encontrados."
+    if sug_2: prompt = "Quem são os alunos com mais faltas e quais seus principais motivos?"
+    if sug_3: prompt = "Quais alunos alcançaram dominío (autônomo) frequentemente e podem ter alta em breve?"
+
+    # 3. Tratar a Entrada do Usuário
+    if prompt:
         # Adicionar mensagem na tela/historico user
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
@@ -114,7 +132,7 @@ def render():
                 try:
                     # Request Streaming Standard
                     stream = client.chat.completions.create(
-                        model="gpt-3.5-turbo", # Default rapido
+                        model="gpt-4o-mini", # Modelo atualizado e rapido
                         messages=api_messages,
                         stream=True,
                     )

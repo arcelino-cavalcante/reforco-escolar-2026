@@ -58,7 +58,12 @@ if st.session_state.perfil is None:
         _, pw_col, _ = st.columns([1, 2, 1])
         with pw_col:
             senha = st.text_input("Digite a senha de acesso:", type="password")
-            if senha == "123456":
+            # Senha carregada dos Secrets (nuvem) ou fallback local
+            try:
+                senha_correta = st.secrets.get("coordenacao", {}).get("senha", "123456")
+            except Exception:
+                senha_correta = "123456"  # Fallback para desenvolvimento local
+            if senha == senha_correta:
                 st.session_state.perfil = "coordenacao"
                 st.session_state.pedir_senha_coord = False
                 st.rerun()

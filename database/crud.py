@@ -1,5 +1,53 @@
 from database.connection import get_db
 import datetime
+import streamlit as st
+
+# ==========================================
+# ESCALA UNIFICADA DE COMPREENSÃO
+# ==========================================
+# Mapeamento qualitativo → pontuação interna (1-4)
+ESCALA_COMPREENSAO = [
+    "Não compreendeu a habilidade",
+    "Compreendeu com muita intervenção",
+    "Compreendeu com pouca intervenção",
+    "Autônomo (Domínio total)"
+]
+
+ESCALA_PONTUACAO = {
+    "Não compreendeu a habilidade": 1,
+    "Compreendeu com muita intervenção": 2,
+    "Compreendeu com pouca intervenção": 3,
+    "Autônomo (Domínio total)": 4
+}
+
+def compreensao_para_nota(valor):
+    """Converte valor de compreensão (string qualitativa ou int legado) para pontuação 1-4."""
+    if isinstance(valor, str):
+        return ESCALA_PONTUACAO.get(valor, 0)
+    if isinstance(valor, (int, float)):
+        # Dados legados (escala 1-10): converter proporcionalmente para 1-4
+        if valor <= 3: return 1
+        if valor <= 5: return 2
+        if valor <= 7: return 3
+        return 4
+    return 0
+
+def compreensao_label(valor):
+    """Retorna o label textual da compreensão, independente se veio string ou número."""
+    if isinstance(valor, str) and valor in ESCALA_PONTUACAO:
+        return valor
+    if isinstance(valor, (int, float)):
+        if valor <= 3: return ESCALA_COMPREENSAO[0]
+        if valor <= 5: return ESCALA_COMPREENSAO[1]
+        if valor <= 7: return ESCALA_COMPREENSAO[2]
+        return ESCALA_COMPREENSAO[3]
+    return "Não Avaliado"
+
+def compreensao_emoji(valor):
+    """Retorna emoji visual para o nível de compreensão."""
+    nota = compreensao_para_nota(valor) if not isinstance(valor, int) or valor > 4 else valor
+    emojis = {1: "🔴", 2: "🟠", 3: "🟡", 4: "🟢"}
+    return emojis.get(nota, "⚪")
 
 # ==========================================
 # HELPERS
@@ -16,6 +64,7 @@ def _docs_to_list(docs):
 # ==========================================
 # ETAPAS
 # ==========================================
+@st.cache_data(ttl=15)
 def listar_etapas():
     db = get_db()
     return _docs_to_list(db.collection('etapas').get())
@@ -34,6 +83,7 @@ def atualizar_turma(id, nome, etapa_id):
     db.collection('turmas').document(str(id)).update({'nome': nome, 'etapa_id': str(etapa_id)})
     return 1
 
+@st.cache_data(ttl=15)
 def listar_turmas(etapa_id=None):
     db = get_db()
     etapas_map = {e.id: e.to_dict().get('nome', '') for e in db.collection('etapas').get()}
@@ -64,6 +114,7 @@ def atualizar_estudante(id, nome, turma_id):
     db.collection('estudantes').document(str(id)).update({'nome': nome, 'turma_id': str(turma_id)})
     return 1
 
+@st.cache_data(ttl=15)
 def listar_estudantes(turma_id=None):
     db = get_db()
     turmas_dict = {t['id']: t for t in listar_turmas()}
@@ -100,6 +151,7 @@ def atualizar_prof_reforco(prof_id, nome, area, turmas_ids):
     })
     return 1
 
+@st.cache_data(ttl=15)
 def listar_profs_reforco():
     db = get_db()
     return sorted(_docs_to_list(db.collection('professores_reforco').get()), key=lambda x: x.get('nome', ''))
@@ -130,6 +182,7 @@ def atualizar_prof_regente(prof_id, nome, area, turmas_ids):
     })
     return 1
 
+@st.cache_data(ttl=15)
 def listar_profs_regentes():
     db = get_db()
     return sorted(_docs_to_list(db.collection('professores_regentes').get()), key=lambda x: x.get('nome', ''))
@@ -156,7 +209,7 @@ def obter_regente_por_turma_e_area(turma_id, area_disciplina):
             return d
     return None
 
-def criar_registro_diario(estudante_id, prof_id, data_registro, bimestre, prof_regente_id, compareceu, motivo_falta, origem_conteudo, habilidade_trabalhada, nivel_compreensao="Não Avaliado", participacao=None, observacao=None, dificuldade_latente=None):
+def criar_registro_diario(estudante_id, prof_id, data_registro, bimestre, prof_regente_id, compareceu, motivo_falta, origem_conteudo, habilidade_trabalhada, nivel_compreensao="Não Avaliado", participacao=None, observacao=None, dificuldade_latente=None, tipo_atividade=None, estado_emocional=None):
     db = get_db()
     ref = db.collection('registros_diarios').document()
     ref.set({
@@ -166,17 +219,21 @@ def criar_registro_diario(estudante_id, prof_id, data_registro, bimestre, prof_r
         'compareceu': compareceu, 'motivo_falta': motivo_falta,
         'origem_conteudo': origem_conteudo, 'habilidade_trabalhada': habilidade_trabalhada,
         'nivel_compreensao': nivel_compreensao, 'participacao': participacao, 'observacao': observacao,
-        'dificuldade_latente': dificuldade_latente
+        'dificuldade_latente': dificuldade_latente,
+        'tipo_atividade': tipo_atividade,
+        'estado_emocional': estado_emocional
     })
     return ref.id
 
-def atualizar_registro_diario(id_reg, compareceu, motivo_falta, origem_conteudo, habilidade_trabalhada, nivel_compreensao="Não Avaliado", participacao=None, observacao=None, dificuldade_latente=None):
+def atualizar_registro_diario(id_reg, compareceu, motivo_falta, origem_conteudo, habilidade_trabalhada, nivel_compreensao="Não Avaliado", participacao=None, observacao=None, dificuldade_latente=None, tipo_atividade=None, estado_emocional=None):
     db = get_db()
     db.collection('registros_diarios').document(str(id_reg)).update({
         'compareceu': compareceu, 'motivo_falta': motivo_falta,
         'origem_conteudo': origem_conteudo, 'habilidade_trabalhada': habilidade_trabalhada,
         'nivel_compreensao': nivel_compreensao, 'participacao': participacao, 'observacao': observacao,
-        'dificuldade_latente': dificuldade_latente
+        'dificuldade_latente': dificuldade_latente,
+        'tipo_atividade': tipo_atividade,
+        'estado_emocional': estado_emocional
     })
     return 1
 
@@ -213,6 +270,7 @@ def listar_registros_por_regente(prof_regente_id, bimestre_filtro=None):
     return sorted(regs, key=lambda x: x.get('data_registro', ''), reverse=True)
 
 def obter_media_diaria_estudante_bimestre(estudante_id, prof_id, bimestre):
+    """Calcula média de compreensão do bimestre usando escala unificada 1-4."""
     db = get_db()
     q = db.collection('registros_diarios') \
         .where('estudante_id', '==', str(estudante_id)) \
@@ -220,17 +278,15 @@ def obter_media_diaria_estudante_bimestre(estudante_id, prof_id, bimestre):
         .where('bimestre', '==', bimestre).get()
     soma = 0
     cnt = 0
-    # Modificado para se adequar a Strings de avaliacao qualitativa no legadinho se tiver int
-    # Caso tenham sido salvas string, daremos fallback pq não há como somar "Autonomo".
-    # Retornarei Null (None) se a nova escala predominou 
     for doc in q:
         d = doc.to_dict()
         if d.get('compareceu') == 1:
             val = d.get('nivel_compreensao', 0)
-            if isinstance(val, (int, float)):
-                soma += float(val)
+            nota = compreensao_para_nota(val)
+            if nota > 0:
+                soma += nota
                 cnt += 1
-    return round(soma/cnt) if cnt>0 else None
+    return round(soma / cnt, 1) if cnt > 0 else None
 
 def contar_presencas_estudante(estudante_id, prof_id):
     db = get_db()
@@ -283,15 +339,18 @@ def atualizar_consolidado_mensal(id_resumo, data_registro,
 # ==========================================
 # GESTÃO COORDENAÇÃO
 # ==========================================
+@st.cache_data(ttl=30)
 def obter_estatisticas_coordenacao(mes, ano):
     db = get_db()
     stats = {}
     stats['qtd_prof_reforco'] = len(_docs_to_list(db.collection('professores_reforco').get()))
     stats['qtd_prof_regente'] = len(_docs_to_list(db.collection('professores_regentes').get()))
     
-    data_prefix = f"{ano:04d}-{mes:02d}-"
-    regs = _docs_to_list(db.collection('registros_diarios').get())
-    stats['qtd_registros_mes'] = sum(1 for r in regs if r.get('data_registro','').startswith(data_prefix))
+    start_date = f"{ano:04d}-{mes:02d}-01"
+    end_date = f"{ano:04d}-{mes:02d}-31"
+    query_regs = db.collection('registros_diarios').where('data_registro', '>=', start_date).where('data_registro', '<=', end_date).get()
+    regs = _docs_to_list(query_regs)
+    stats['qtd_registros_mes'] = len(regs)
     
     estudantes = _docs_to_list(db.collection('estudantes').get())
     stats['qtd_total_estudantes'] = len(estudantes)
@@ -327,11 +386,13 @@ def obter_estatisticas_reforco(prof_id):
     stats['qtd_atendidos_semana'] = len(atendidos)
     return stats
 
+@st.cache_data(ttl=30)
 def listar_todos_registros_mes(mes, ano):
     db = get_db()
-    data_prefix = f"{ano:04d}-{mes:02d}-"
-    regs = _docs_to_list(db.collection('registros_diarios').get())
-    regs = [r for r in regs if r.get('data_registro','').startswith(data_prefix)]
+    start_date = f"{ano:04d}-{mes:02d}-01"
+    end_date = f"{ano:04d}-{mes:02d}-31"
+    query = db.collection('registros_diarios').where('data_registro', '>=', start_date).where('data_registro', '<=', end_date).get()
+    regs = _docs_to_list(query)
     return sorted(_build_registros_diarios(regs), key=lambda x: x.get('data_registro',''), reverse=True)
 
 def listar_todos_registros_diarios():
@@ -425,7 +486,7 @@ def listar_consolidados_por_regente(prof_regente_id, bimestre="Todos"):
     regs = _docs_to_list(query.get())
     
     # Anexar nome do professor de reforço
-    profs = {p['id']: p for p in _docs_to_list(db.collection('professores').where('tipo', '==', 'Reforço').get())}
+    profs = {p['id']: p for p in _docs_to_list(db.collection('professores_reforco').get())}
     for r in regs:
         r['prof_reforco_nome'] = profs.get(r.get('prof_id'), {}).get('nome', 'Equipe de Reforço')
         
@@ -441,7 +502,7 @@ def listar_consolidados_por_estudante(estudante_id):
     q = db.collection('consolidados_mensais').where('estudante_id', '==', str(estudante_id)).get()
     regs = _docs_to_list(q)
     # inject teacher info
-    profs = {p['id']: p for p in _docs_to_list(db.collection('professores').where('tipo', '==', 'Reforço').get())}
+    profs = {p['id']: p for p in _docs_to_list(db.collection('professores_reforco').get())}
     for r in regs:
         r['prof_reforco_nome'] = profs.get(r.get('prof_id'), {}).get('nome', 'Equipe de Reforço')
     return sorted(regs, key=lambda x: x.get('data_registro',''), reverse=True)

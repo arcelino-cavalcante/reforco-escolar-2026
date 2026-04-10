@@ -64,9 +64,11 @@ def _render_turmas():
                 st.session_state.editando_turma = t['id']
                 st.rerun()
                 
-            if col_btn_del.button("🗑️ Apagar", key=f"btn_del_t_{t['id']}", use_container_width=True):
-                excluir_turma(t['id'])
-                st.rerun()
+            with col_btn_del.popover("🗑️ Apagar", use_container_width=True):
+                st.warning("Confirma a exclusão?")
+                if st.button("Sim, apagar", key=f"conf_del_t_{t['id']}", use_container_width=True):
+                    excluir_turma(t['id'])
+                    st.rerun()
 
             # Renderizar Form Inline caso este seja o item sendo editado
             if st.session_state.editando_turma == t['id']:
@@ -152,9 +154,11 @@ def _render_estudantes():
                 st.session_state.editando_estud = est['id']
                 st.rerun()
                 
-            if col_btn_del.button("🗑️ Apagar", key=f"btn_del_est_{est['id']}", use_container_width=True):
-                excluir_estudante(est['id'])
-                st.rerun()
+            with col_btn_del.popover("🗑️ Apagar", use_container_width=True):
+                st.warning("Confirma a exclusão?")
+                if st.button("Sim, apagar", key=f"conf_del_est_{est['id']}", use_container_width=True):
+                    excluir_estudante(est['id'])
+                    st.rerun()
 
             if st.session_state.editando_estud == est['id']:
                 st.divider()
@@ -209,12 +213,14 @@ def _render_prof_card(p, tipo, turmas_map):
             st.session_state.editando_prof = chave_id
             st.rerun()
             
-        if col_btn_del.button("🗑️ Apagar", key=f"btn_del_prof_{chave_id}", use_container_width=True):
-            if tipo == 'Reforço':
-                excluir_prof_reforco(p['id'])
-            else:
-                excluir_prof_regente(p['id'])
-            st.rerun()
+        with col_btn_del.popover("🗑️ Apagar", use_container_width=True):
+            st.warning("Confirma a exclusão?")
+            if st.button("Sim, apagar", key=f"conf_del_prof_{chave_id}", use_container_width=True):
+                if tipo == 'Reforço':
+                    excluir_prof_reforco(p['id'])
+                else:
+                    excluir_prof_regente(p['id'])
+                st.rerun()
 
         if st.session_state.get('editando_prof') == chave_id:
             st.divider()

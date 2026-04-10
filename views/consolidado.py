@@ -3,7 +3,8 @@ import datetime
 from database.crud import (
     listar_estudantes, obter_turmas_prof_reforco,
     obter_consolidado_trimestre, criar_consolidado_mensal, atualizar_consolidado_mensal,
-    listar_profs_reforco, obter_regente_por_turma_e_area, obter_media_diaria_estudante_bimestre
+    listar_profs_reforco, obter_regente_por_turma_e_area, obter_media_diaria_estudante_bimestre,
+    ESCALA_COMPREENSAO
 )
 from utils.styles import page_header
 
@@ -78,12 +79,17 @@ def render():
             m_adi = m_sub = m_mul = m_div = m_res = None
             p_esc = p_lei = p_int = p_pon = None
             
-            # Cálculo de IA / Sugestão baseada em Histórico
+            # Cálculo de IA / Sugestão baseada em Histórico (escala unificada 1-4)
             media_diaria = obter_media_diaria_estudante_bimestre(est_id, prof_id, bim_sel)
-            fallback_val = media_diaria if media_diaria is not None else 5
+            # Converter média 1-4 para escala 1-10 para os campos de nota
+            if media_diaria is not None:
+                fallback_val = max(1, min(10, round(media_diaria * 2.5)))
+            else:
+                fallback_val = 5
             
             if media_diaria is not None and not reg_existente:
-                st.caption(f"🤖 *Nota: As notas iniciais foram sugeridas com base em uma **média diária de {media_diaria}** nos Diários do bimestre.*")
+                nivel_texto = ESCALA_COMPREENSAO[min(3, max(0, round(media_diaria) - 1))]
+                st.caption(f"🤖 *Nota: Sugestão baseada na média diária de **{media_diaria}/4** ({nivel_texto}) nos Diários do bimestre.*")
             
             # BLOCO MATEMÁTICA
             if area_prof == "Matemática":

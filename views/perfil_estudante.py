@@ -3,7 +3,8 @@ import pandas as pd
 import datetime
 from database.crud import (
     listar_turmas, listar_estudantes,
-    listar_registros_por_estudante, listar_consolidados_por_estudante
+    listar_registros_por_estudante, listar_consolidados_por_estudante,
+    compreensao_para_nota, compreensao_label, compreensao_emoji
 )
 from utils.styles import page_header
 
@@ -62,15 +63,11 @@ def render():
         aulas_mat = len(df_d[(df_d['compareceu'] == 1) & (df_d['prof_area'] == 'Matemática')])
         aulas_port = len(df_d[(df_d['compareceu'] == 1) & (df_d['prof_area'] == 'Português')])
 
-        # Calcular nível de Autonomia Pessoal
-        def calc_autonomia(val):
-            if isinstance(val, str) and "Autônomo" in val: return 1
-            if isinstance(val, (int, float)) and val >= 8: return 1
-            return 0
-            
+        # Calcular nível de Autonomia Pessoal (usando escala unificada)
         df_pres = df_d[df_d['compareceu'] == 1].copy()
         if not df_pres.empty and 'nivel_compreensao' in df_pres.columns:
-            df_pres['is_autonomo'] = df_pres['nivel_compreensao'].apply(calc_autonomia)
+            df_pres['nota_unificada'] = df_pres['nivel_compreensao'].apply(compreensao_para_nota)
+            df_pres['is_autonomo'] = df_pres['nota_unificada'].apply(lambda x: 1 if x == 4 else 0)
             taxa_autonomia = (df_pres['is_autonomo'].sum() / len(df_pres)) * 100
         else:
             taxa_autonomia = 0
@@ -102,6 +99,24 @@ def render():
                 st.write(f"*Obs. Privada do Reforço:* {cons.get('observacao_geral')}")
             st.divider()
 
+    # 4.5 Evolução Temporal em Gráfico
+    if not df_d.empty:
+        df_pres_evol = df_d[df_d['compareceu'] == 1].copy()
+        if len(df_pres_evol) > 1 and 'nivel_compreensao' in df_pres_evol.columns:
+            st.subheader("📈 Evolução Temporal (Compreensão)")
+            df_pres_evol['nota'] = df_pres_evol['nivel_compreensao'].apply(compreensao_para_nota)
+            df_pres_evol['data_dt'] = pd.to_datetime(df_pres_evol['data_registro'])
+            df_pres_evol = df_pres_evol.sort_values(by='data_dt', ascending=True)
+            
+            import plotly.express as px
+            fig_evol = px.line(df_pres_evol, x='data_registro', y='nota', markers=True, color='prof_area',
+                               title="Evolução da Avaliação ao Longo do Tempo",
+                               labels={'data_registro': 'Data da Aula', 'nota': 'Nível (1 a 4)', 'prof_area': 'Disciplina'},
+                               color_discrete_sequence=px.colors.qualitative.Bold)
+            fig_evol.update_yaxes(range=[0.5, 4.5], tickvals=[1, 2, 3, 4], ticktext=["1 - Não comp.", "2 - Muita int.", "3 - Pouca int.", "4 - Autônomo"])
+            st.plotly_chart(fig_evol, use_container_width=True)
+            st.divider()
+
     # 5. Timeline Vertical (Logs Diários)
     if not df_d.empty:
         st.subheader("📆 Timeline Contínua (Lançamentos de Reforço)")
@@ -114,16 +129,21 @@ def render():
             # Caixa estilizada baseada na presença
             with st.container(border=True):
                 if reg['compareceu'] == 1:
-                    st.markdown(f"🗓️ **{data_f}** | Bimestre: {reg.get('bimestre')} | **🟢 PREENTE**")
+                    st.markdown(f"🗓️ **{data_f}** | Bimestre: {reg.get('bimestre')} | **🟢 PRESENTE**")
                     st.markdown(f"**Área:** {area} (`Professor(a): {prof_nome}`)")
                     st.markdown(f"**Habilidade Trabalhada:** {reg.get('habilidade_trabalhada')}")
                     
-                    # Nivel de compreensao text formatado ou numero legado
-                    nv = reg.get('nivel_compreensao')
-                    if isinstance(nv, (int, float)):
-                        st.markdown(f"**Compreensão alcançada:** Recebeu Nota {nv}/10 ({reg.get('participacao')})")
-                    else:
-                        st.markdown(f"**Compreensão alcançada:** *{nv}* ({reg.get('participacao')})")
+                    # Compreensão unificada (qualitativa com emoji)
+                    nv_raw = reg.get('nivel_compreensao')
+                    nv_label = compreensao_label(nv_raw)
+                    nv_emoji = compreensao_emoji(nv_raw)
+                    st.markdown(f"**Compreensão alcançada:** {nv_emoji} *{nv_label}* | Foco: {reg.get('participacao')}")
+                    
+                    if reg.get('tipo_atividade'):
+                        st.markdown(f"**Tipo de Atividade:** {reg.get('tipo_atividade')}")
+                        
+                    if reg.get('estado_emocional') and reg.get('estado_emocional') != "Não Observado":
+                        st.markdown(f"**Estado Emocional:** {reg.get('estado_emocional')}")
                     
                     if reg.get('dificuldade_latente'):
                         st.markdown(f"**⚠️ Gargalo Latente Mapeado:** <span style='color:red;'>{reg.get('dificuldade_latente')}</span>", unsafe_allow_html=True)

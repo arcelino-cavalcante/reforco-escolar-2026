@@ -3,9 +3,9 @@ import datetime
 from database.crud import (
     listar_registros_por_regente, listar_turmas, obter_turmas_prof_regente, 
     criar_encaminhamento, listar_encaminhamentos_enviados_estudante,
-    marcar_encaminhamento_lido_regente, listar_consolidados_por_regente
+    marcar_encaminhamento_lido_regente, listar_consolidados_por_regente,
+    compreensao_label, compreensao_emoji
 )
-from utils.styles import page_header
 from utils.styles import page_header
 
 def render():
@@ -45,12 +45,30 @@ def render():
     
     for idx, (aba, t_obj) in enumerate(zip(abas, turmas_obj)):
         with aba:
-            # Filtramos da listona gigante apenas os dados DESTA turma em laco
             dados_turma = [d for d in dados if d['turma_id'] == t_obj['id']]
             
             if not dados_turma:
                 st.write("*(Nenhum dado lançado para esta turma)*")
                 continue
+            
+            # --- PAINEL GERAL DA TURMA ---
+            st.subheader("📈 Panorama de Evolução da Turma")
+            import pandas as pd
+            import plotly.express as px
+            df_t = pd.DataFrame(dados_turma)
+            if not df_t.empty and 'compareceu' in df_t.columns:
+                df_pres = df_t[df_t['compareceu'] == 1].copy()
+                if not df_pres.empty:
+                    df_pres['nivel_compreensao'] = df_pres['nivel_compreensao'].fillna("Não Avaliado")
+                    comp_counts = df_pres['nivel_compreensao'].value_counts().reset_index()
+                    comp_counts.columns = ['Nível', 'Qtd (Aulas)']
+                    fig_class = px.bar(comp_counts, x='Qtd (Aulas)', y='Nível', orientation='h', color='Nível', title="Níveis de Compreensão (Aulas da Turma)")
+                    st.plotly_chart(fig_class, use_container_width=True)
+                else:
+                    st.info("Todos os registros lançados são de faltas.")
+            
+            st.divider()
+            st.subheader("Detalhes Individuais por Estudante")
                 
             # Extrair alunos únicos (que passaram no reforço) desta turma
             aluno_ids = list(set([d['estudante_id'] for d in dados_turma]))
@@ -90,8 +108,10 @@ def render():
                             if log['compareceu'] == 1:
                                 obs = f" \n*Obs: {log['observacao']}*" if log['observacao'] else ""
                                 pt = log.get('participacao', 'Não especificado')
-                                nv = log.get('nivel_compreensao', 0)
-                                st.markdown(f"🟢 **{log['origem_conteudo']}**  \n*{log['habilidade_trabalhada']}*  \nNível de Desempenho: **{nv}/10** ({pt}){obs}  \n`Professor: {log['prof_reforco_nome']} ({log['prof_reforco_area']})`")
+                                nv_raw = log.get('nivel_compreensao', 0)
+                                nv_label = compreensao_label(nv_raw)
+                                nv_emoji = compreensao_emoji(nv_raw)
+                                st.markdown(f"🟢 **{log['origem_conteudo']}**  \n*{log['habilidade_trabalhada']}*  \nCompreensão: {nv_emoji} **{nv_label}** | Foco: {pt}{obs}  \n`Professor: {log['prof_reforco_nome']} ({log['prof_reforco_area']})`")
                             else:
                                 st.markdown(f"🔴 **Ausente**  \n*{log['motivo_falta']}*  \n`Lançado por: {log['prof_reforco_nome']} ({log['prof_reforco_area']})`")
                         

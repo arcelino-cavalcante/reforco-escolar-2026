@@ -66,7 +66,10 @@ def render():
     # Coluna híbrida (Se presente joga Habilidade, se ausente joga Motivo)
     def calc_resumo(row):
         if row['compareceu'] == 1:
-            return f"{row['origem_conteudo']} - {row['habilidade_trabalhada']}"
+            texto = f"{row['origem_conteudo']} - {row['habilidade_trabalhada']}"
+            if 'tipo_atividade' in row and pd.notna(row['tipo_atividade']):
+                texto += f" ({row['tipo_atividade']})"
+            return texto
         return f"Motivo Falta: {row['motivo_falta']}"
         
     df_exibicao['Anotação do Dia'] = df_exibicao.apply(calc_resumo, axis=1)
