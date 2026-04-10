@@ -30,80 +30,90 @@ if 'prof_nome' not in st.session_state:
 
 # ===== TELA DE LOGIN =====
 if st.session_state.perfil is None:
-    st.markdown("<br><br><br>", unsafe_allow_html=True)
-    st.markdown("<h1 style='text-align: center;'>Bem-vindo ao Sistema de Reforço</h1>", unsafe_allow_html=True)
-    st.markdown("<h3 style='text-align: center; color: gray;'>Identifique-se para entrar:</h3>", unsafe_allow_html=True)
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; color: #2C3E50;'>Portal Educacional de Reforço</h1>", unsafe_allow_html=True)
+    st.markdown("<h4 style='text-align: center; color: #7F8C8D; margin-bottom: 40px;'>Selecione o seu perfil de acesso</h4>", unsafe_allow_html=True)
     
-    col1, col2, col3, col4, col5 = st.columns([1, 2, 2, 2, 1])
-    with col2:
-        if st.button("👨‍🏫 Professor de Reforço", use_container_width=True, type="primary"):
-            st.session_state.modo_login = "login_reforco"
-            st.rerun()
-    with col3:
-        if st.button("👩‍🏫 Professor Regente", use_container_width=True, type="primary"):
-            st.session_state.modo_login = "login_regente"
-            st.rerun()
-    with col4:
-        if "pedir_senha_coord" not in st.session_state:
-            st.session_state.pedir_senha_coord = False
-
-        if st.button("📋 Coordenação", use_container_width=True, type="secondary"):
-            st.session_state.pedir_senha_coord = True
+    _, center_col, _ = st.columns([1, 4, 1])
+    
+    with center_col:
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            with st.container(border=True):
+                st.markdown("<div style='text-align: center; font-size: 3.5rem; margin-bottom:10px;'>👨‍🏫</div>", unsafe_allow_html=True)
+                if st.button("Prof. de Reforço", use_container_width=True, type="primary"):
+                    st.session_state.modo_login = "login_reforco"
+                    if "pedir_senha_coord" in st.session_state: st.session_state.pedir_senha_coord = False
+        with c2:
+            with st.container(border=True):
+                st.markdown("<div style='text-align: center; font-size: 3.5rem; margin-bottom:10px;'>👩‍🏫</div>", unsafe_allow_html=True)
+                if st.button("Prof. Regente", use_container_width=True, type="primary"):
+                    st.session_state.modo_login = "login_regente"
+                    if "pedir_senha_coord" in st.session_state: st.session_state.pedir_senha_coord = False
+        with c3:
+            with st.container(border=True):
+                st.markdown("<div style='text-align: center; font-size: 3.5rem; margin-bottom:10px;'>📋</div>", unsafe_allow_html=True)
+                if st.button("Coordenação", use_container_width=True):
+                    st.session_state.pedir_senha_coord = True
+                    st.session_state.modo_login = None
 
     st.markdown("<br>", unsafe_allow_html=True)
     
     # Campo de Senha para Coordenação
-    if st.session_state.pedir_senha_coord:
-        _, pw_col, _ = st.columns([1, 2, 1])
+    if st.session_state.get("pedir_senha_coord", False):
+        _, pw_col, _ = st.columns([2, 3, 2])
         with pw_col:
-            senha = st.text_input("Digite a senha de acesso:", type="password")
-            # Senha carregada dos Secrets (nuvem) ou fallback local
-            try:
-                senha_correta = st.secrets.get("coordenacao", {}).get("senha", "123456")
-            except Exception:
-                senha_correta = "123456"  # Fallback para desenvolvimento local
-            if senha == senha_correta:
-                st.session_state.perfil = "coordenacao"
-                st.session_state.pedir_senha_coord = False
-                st.rerun()
-            elif senha != "":
-                st.error("Senha incorreta!")
+            with st.form("form_coord"):
+                st.info("🔐 Área restrita à Coordenação Pedagógica")
+                senha = st.text_input("Digite a senha de acesso:", type="password")
+                submit = st.form_submit_button("Entrar", type="primary", use_container_width=True)
+                
+                if submit:
+                    try:
+                        senha_correta = st.secrets.get("coordenacao", {}).get("senha", "123456")
+                    except Exception:
+                        senha_correta = "123456"
+                    if senha == senha_correta:
+                        st.session_state.perfil = "coordenacao"
+                        st.session_state.pedir_senha_coord = False
+                        st.rerun()
+                    else:
+                        st.error("Senha incorreta!")
     
     # Exibir dropdowns de login se selecionou um modo de professor
-    if st.session_state.modo_login == "login_reforco":
-        _, col_login, _ = st.columns([1, 2, 1])
+    elif st.session_state.modo_login in ["login_reforco", "login_regente"]:
+        _, col_login, _ = st.columns([2, 3, 2])
         with col_login:
-            st.info("Logando como Professor de Reforço")
-            profs = listar_profs_reforco()
-            if not profs:
-                st.warning("Nenhum professor de reforço cadastrado pela Coordenação.")
-            else:
-                opcoes = {p['nome']: p['id'] for p in profs}
-                nome_sel = st.selectbox("Selecione seu Nome:", list(opcoes.keys()))
-                if st.button("Entrar no Sistema", type="primary", use_container_width=True):
-                    st.session_state.perfil = "reforco"
-                    st.session_state.prof_id = opcoes[nome_sel]
-                    st.session_state.prof_nome = nome_sel
-                    st.session_state.modo_login = None
-                    st.rerun()
+            with st.container(border=True):
+                if st.session_state.modo_login == "login_reforco":
+                    st.markdown("#### 🔓 Acesso: Reforço Escolar")
+                    profs = listar_profs_reforco()
+                    if not profs:
+                        st.warning("Nenhum professor de reforço cadastrado pela Coordenação.")
+                    else:
+                        opcoes = {p['nome']: p['id'] for p in profs}
+                        nome_sel = st.selectbox("Selecione sua identificação:", list(opcoes.keys()))
+                        if st.button("Entrar no Sistema", type="primary", use_container_width=True):
+                            st.session_state.perfil = "reforco"
+                            st.session_state.prof_id = opcoes[nome_sel]
+                            st.session_state.prof_nome = nome_sel
+                            st.session_state.modo_login = None
+                            st.rerun()
 
-    elif st.session_state.modo_login == "login_regente":
-        _, col_login, _ = st.columns([1, 2, 1])
-        with col_login:
-            st.info("Logando como Professor Regente")
-            profs = listar_profs_regentes()
-            if not profs:
-                st.warning("Nenhum professor regente cadastrado pela Coordenação.")
-            else:
-                opcoes = {p['nome']: p['id'] for p in profs}
-                nome_sel = st.selectbox("Selecione seu Nome:", list(opcoes.keys()))
-                if st.button("Entrar no Sistema", type="primary", use_container_width=True):
-                    st.session_state.perfil = "regente"
-                    st.session_state.prof_id = opcoes[nome_sel]
-                    st.session_state.prof_nome = nome_sel
-                    st.session_state.modo_login = None
-                    st.rerun()
+                elif st.session_state.modo_login == "login_regente":
+                    st.markdown("#### 🔓 Acesso: Prof. Regente")
+                    profs = listar_profs_regentes()
+                    if not profs:
+                        st.warning("Nenhum professor regente cadastrado.")
+                    else:
+                        opcoes = {p['nome']: p['id'] for p in profs}
+                        nome_sel = st.selectbox("Selecione sua identificação:", list(opcoes.keys()))
+                        if st.button("Entrar no Sistema", type="primary", use_container_width=True):
+                            st.session_state.perfil = "regente"
+                            st.session_state.prof_id = opcoes[nome_sel]
+                            st.session_state.prof_nome = nome_sel
+                            st.session_state.modo_login = None
+                            st.rerun()
 
 # ===== MENUS DO SISTEMA (PÓS-LOGIN) =====
 else:
