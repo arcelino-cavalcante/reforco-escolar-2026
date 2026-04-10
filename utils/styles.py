@@ -4,10 +4,15 @@ def aplicar_estilos():
     """Remove branding do Streamlit e aplica visual de aplicativo nativo."""
     st.markdown("""
         <style>
-            #MainMenu {visibility: hidden;}
+            #MainMenu {display: none !important; visibility: hidden !important;}
             footer {visibility: hidden;}
             .stDeployButton {display:none !important;}
             
+            /* Remove ferramentas irritantes do Streamlit Cloud (Estrela, Share, Menu) do lado direito */
+            [data-testid="stHeaderActionElements"] {
+                display: none !important;
+            }
+
             /* Remove marca d'água e botão de deploy, mas mantém o Header funcional */
             [data-testid="stHeader"] {
                 background-color: rgba(255, 255, 255, 0);
