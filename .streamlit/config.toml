@@ -1,0 +1,15 @@
+[theme]
+primaryColor = "#2C3E50"
+backgroundColor = "#F8F9FA"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#212529"
+font = "sans serif"
+
+[client]
+# Modo minimalista esconde links de "fork", estrelas do github no topo
+# e oculta as ferramentas extras.
+toolbarMode = "minimal"
+showSidebarNavigation = false
+
+[ui]
+hideTopBar = true

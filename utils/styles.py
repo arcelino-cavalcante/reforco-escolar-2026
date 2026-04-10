@@ -13,6 +13,12 @@ def aplicar_estilos():
                 display: none !important;
             }
 
+            /* Bloqueia agressivamente a tag Mange App (bolinha com foto) do canto inferior direito do Streamlit Cloud */
+            .viewerBadge_container { display: none !important; }
+            .viewerBadge_link { display: none !important; }
+            #viewerBadge { display: none !important; }
+            iframe[src*="badge"] { display: none !important; }
+
             /* Remove marca d'água e botão de deploy, mas mantém o Header funcional */
             [data-testid="stHeader"] {
                 background-color: rgba(255, 255, 255, 0);
