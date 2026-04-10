@@ -1,72 +1,102 @@
 import streamlit as st
 import json
+import datetime
+import httpx
 from openai import OpenAI
-from database.crud import listar_estudantes, listar_todos_registros_diarios_ultimos_dias, obter_contexto_ia
+from database.crud import obter_contexto_ia, tool_listar_alunos, tool_listar_registros_mes, tool_buscar_historico_aluno
 from utils.styles import page_header
 
-def build_data_context_text():
-    estudantes = listar_estudantes()
-    # OTIMIZAÇÃO: Filtrando penas os ultimos 30 dias de registros para não estourar a cota Token
-    diarios = listar_todos_registros_diarios_ultimos_dias(30)
-    
-    # OTIMIZAÇÃO: Exportando os arrays JSON para CSV para economia superior a 60% do peso do prompt
-    est_lines = ["ALUNOS: Nome, Turma, Etapa"]
-    for e in estudantes: 
-        est_lines.append(f"{e['nome']},{e['turma_nome']},{e['etapa_nome']}")
-    estudantes_csv = "\n".join(est_lines)
-    
-    dia_lines = ["\nREGISTROS (Últimos 30 dias): Data,Aluno,Prof,Area,Presenca,Habilidade_Falta,Compreensao,Atividade,Emocional"]
-    for r in diarios:
-        hab_falta = r['habilidade_trabalhada'] if r['compareceu'] == 1 else (r['motivo_falta'] or 'Falta')
-        comp = r.get('nivel_compreensao', 0) if r['compareceu'] == 1 else "-"
-        ativ = r.get('tipo_atividade') or "-"
-        emoc = r.get('estado_emocional') or "-"
-        # Removido espaços excessivos propositalmente
-        dia_lines.append(f"{r['data_registro']},{r['estudante_nome']},{r['prof_nome']},{r['prof_area']},{'Sim' if r['compareceu']==1 else 'Nao'},{hab_falta},{comp},{ativ},{emoc}")
-    diarios_csv = "\n".join(dia_lines)
-    
-    return estudantes_csv + "\n" + diarios_csv
+# ==========================================
+# DEFINIÇÃO DAS TOOLS PARA A API OPENAI
+# ==========================================
+AVAILABLE_TOOLS = {
+    "tool_listar_alunos": tool_listar_alunos,
+    "tool_listar_registros_mes": tool_listar_registros_mes,
+    "tool_buscar_historico_aluno": tool_buscar_historico_aluno
+}
+
+TOOLS_SCHEMA = [
+    {
+        "type": "function",
+        "function": {
+            "name": "tool_listar_alunos",
+            "description": "Lista todos os alunos matriculados no reforço e suas respectivas turmas. Útil para descobrir se um aluno existe e em qual turma ele está lotado.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "turma_nome": {
+                        "type": "string",
+                        "description": "Nome da turma para filtrar (ex: '3º Ano A'). Passe 'Todas' para listar a escola inteira."
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "tool_listar_registros_mes",
+            "description": "Retorna uma lista massiva com todos os registros diários (aulas dadas) de um mês específico. Fundamental para encontrar maiores gargalos, relatórios de faltas mais frequentes, habilidades mais exercitadas e estados emocionais relatados.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "mes": {"type": "integer", "description": "Mês numérico (ex: 4 para Abril)."},
+                    "ano": {"type": "integer", "description": "Ano numérico (ex: 2026)."}
+                },
+                "required": ["mes", "ano"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "tool_buscar_historico_aluno",
+            "description": "Busca TODAS as anotações do diário focadas exclusivamente em um único aluno selecionado. Devolve cronologia de datas, presença, habilidades e percepções do professor (compreensão, emoção).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "nome_aluno_parcial": {"type": "string", "description": "Nome, sobrenome, ou fragmento do nome do aluno procurado (ex: 'Maria')."}
+                },
+                "required": ["nome_aluno_parcial"]
+            }
+        }
+    }
+]
 
 def build_system_prompt():
-    """
-    Constrói a string de contexto contendo o "banco de dados" em formato hiper comprimido CSV.
-    Isso fornece à IA o contexto real de alunos e registros limitados e limpos.
-    """
     regras_escola = obter_contexto_ia()
-    data_text = build_data_context_text()
-    
-    prompt = (
-        "Você é o Assistente de IA Pedagógico do sistema de Reforço Escolar.\n"
-        "Abaixo estão os dados dos estudantes e dos registros diários (dos últimos 30 dias) em formato CSV delimitado por vírgula.\n"
-        "Sua função é atuar como analista de dados educacionais, respondendo com clareza, objetividade e cordialidade "
-        "às perguntas da Coordenação sobre a evolução dos alunos, frequência (faltas) e habilidades.\n"
-        f"DIRETRIZES PERSONALIZADAS DA ESCOLA:\n{regras_escola}\n\n"
-        f"DADOS DO SISTEMA:\n{data_text}\n"
-    )
-    return prompt
+    hoje = datetime.date.today()
+    return f"""Você é o Assistente Especialista em Dados do sistema de Reforço Escolar.
+Sua missão é atuar como Analista Pedagógico, respondendo às perguntas do corpo docente com extrema clareza e cordialidade.
+O dia de hoje é {hoje.strftime('%d/%m/%Y')} (Mês {hoje.month}, Ano {hoje.year}).
+
+REGRAS CRÍTICAS (RAG & ATERRAMENTO):
+1. USE AS FERRAMENTAS (TOOLS). Se precisarem saber de alunos antigos, frequências, faltas ou histórico, acione as ferramentas disponíveis em vez de tentar adivinhar.
+2. NUNCA ALUCINE DADOS. Se você buscou algo com a ferramenta e ela retornou vazio ou o aluno não existe, responda explicitamente: "Não encontrei dados suficientes no sistema."
+3. NUNCA revele termos técnicos (como JSON, arrays, 'usei a ferramenta tool_listar...'). Aja naturalmente como se tivesse buscado nos seus próprios arquivos do sistema interno.
+
+DIRETRIZES DA ESCOLA (Instruções Personalizadas do Time de Gestão):
+{regras_escola}
+"""
 
 def render():
-    page_header("🤖 Assistente de IA", "Converse com os dados do sistema usando a OpenAI.")
+    page_header("🤖 Assistente IA Especialista", "Pergunte aos dados da escola. A IA cruza históricos automaticamente para lhe dar o panorama exato do que ocorre nos reforços.")
 
-    # 1. Obter a chave (Prioridade: Secrets do Streamlit Cloud)
+    # 1. Autenticação e Chaves
     api_key_input = ""
     try:
         if "openai" in st.secrets:
             api_key_input = st.secrets["openai"].get("api_key", "")
     except Exception:
-        pass  # Sem secrets.toml — modo local
+        pass  
     
     if not api_key_input:
-        # Tenta campo manual apenas se não houver segredo
         api_key_input = st.text_input("Chave OpenAI não configurada. Digite aqui:", type="password")
         if not api_key_input:
-            st.info("Configure a chave da API no painel de Segredos do Streamlit para omitir este campo.")
+            st.info("Configure a chave da API no banco Secrets ou insira acima.")
             return
 
-    import httpx
-    # Inicializar Cliente OpenAI
     try:
-        # Usa um cliente nativo para contornar problemas de cache de rede do Streamlit
         client = OpenAI(
             api_key=api_key_input,
             http_client=httpx.Client(timeout=60.0)
@@ -75,77 +105,121 @@ def render():
         st.error(f"Erro na configuração da API: {e}")
         return
 
-    # 2. Configurar o estado do Chat (Memória)
+    # 2. Configurar o estado do Chat
     if "messages" not in st.session_state:
         st.session_state.messages = []
-        
-    # InjectSystem Prompt se for o inicio real da interacao subjacente (poupando historico)
-    if "system_prompt_loaded" not in st.session_state:
-        st.session_state.system_prompt_loaded = True
 
-    # Botão para limpar contexto
-    if st.button("🧹 Limpar Histórico de Conversa"):
+    if st.button("🧹 Limpar Histórico do Chat", type="tertiary"):
         st.session_state.messages = []
         st.rerun()
-
     st.write("---")
 
-    # Exibir a conversa historica
+    # Exibir a conversa historica (clean UI)
     for msg in st.session_state.messages:
-        if msg["role"] != "system": # não exibir o enorme system prompt na tela
+        if msg["role"] in ["user", "assistant"]: 
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
 
-    # Sugestões de Perguntas
-    st.write("💡 **Perguntas Sugeridas:**")
+    # 3. Componentes de Sugestão e Input
+    st.write("💡 **Experimente perguntar:**")
     c1, c2, c3 = st.columns(3)
-    sug_1 = c1.button("Quais habilidades mais trabalhadas?", use_container_width=True)
-    sug_2 = c2.button("Resumo de Faltas (Alunos e Motivos)", use_container_width=True)
-    sug_3 = c3.button("Alunos Próximos de ter Alta", use_container_width=True)
+    sug_1 = c1.button("Habilidades com mais gargalos de aprendizagem", use_container_width=True)
+    sug_2 = c2.button("Quem são os alunos que mais faltaram este mês?", use_container_width=True)
+    sug_3 = c3.button("Destaques que se mostraram autônomos hoje", use_container_width=True)
     
-    prompt = st.chat_input("O que você deseja analisar sobre os alunos?")
+    prompt = st.chat_input("O que você deseja descobrir sobre os dados do reforço?")
     
-    if sug_1: prompt = "Liste as habilidades mais trabalhadas e cite os gargalos comuns encontrados."
-    if sug_2: prompt = "Quem são os alunos com mais faltas e quais seus principais motivos?"
-    if sug_3: prompt = "Quais alunos alcançaram dominío (autônomo) frequentemente e podem ter alta em breve?"
+    if sug_1: prompt = "Considerando o mês atual, liste as habilidades que apresentaram mais dificuldade e gargalos pelos alunos, e separe por disciplina."
+    if sug_2: prompt = "Liste detalhadamente quais alunos mais faltaram neste mês e os motivos das faltas deles segundo o diário dos professores."
+    if sug_3: prompt = "Analisando este mês, quais alunos alcançaram níveis de compreensão autônomos e focados e poderiam futuramente receber alta?"
 
-    # 3. Tratar a Entrada do Usuário
+    # 4. Fluxo de Agent (Tool Calling)
     if prompt:
-        # Adicionar mensagem na tela/historico user
+        # User UI
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        # Preparar Mensagens API (Sempre incluindo System Context para ground truth atualizado)
-        # O system_prompt é recalculado caso o banco tenha mudado no decorrer da sessão
+        # Build Context Array
         api_messages = [{"role": "system", "content": build_system_prompt()}]
+        # Adicionar histórico passado de forma que a IA não re-solicite tudo.
+        # Precisaremos garantir que as chamadas de Tool fiquem salvas senao a API acusa erro de contexto
+        # Porém, para manter as coisas super simples e sem estourar o st.session_state com lixo tecnico:
+        # Faremos todas as interceptacoes de Tools nos "bastidores" dentro do MESMO request do usuario,
+        # gerando apenas a resposta final do ASSISTANT, e anexamos isso. Acaba sendo puramente state-less
+        # (se ele precisar re-chamar, deixaremos, mas as ferramentas da nossa camada são rapidíssimas de DB).
         
-        # Filtra histórico de usuario tirando possiveis mensagens de system antigas, e anexa à requisicao
-        historico_user_ai = [m for m in st.session_state.messages if m["role"] != "system"]
-        api_messages.extend(historico_user_ai)
+        for m in st.session_state.messages:
+            api_messages.append(m)
 
         with st.chat_message("assistant"):
-            message_placeholder = st.empty()
-            full_response = ""
-            
-            with st.spinner("Analisando dados do reforço..."):
+            with st.spinner("Refletindo e Consultando Banco de Dados..."):
                 try:
-                    # Request Streaming Standard
-                    stream = client.chat.completions.create(
-                        model="gpt-4o-mini", # Modelo atualizado e rapido
+                    # Primeira ligação à inteligência do modelo. Pode pedir ferramenta.
+                    response = client.chat.completions.create(
+                        model="gpt-4o-mini",
                         messages=api_messages,
-                        stream=True,
+                        tools=TOOLS_SCHEMA,
+                        tool_choice="auto",
                     )
                     
-                    for chunk in stream:
-                        if chunk.choices[0].delta.content is not None:
-                            full_response += chunk.choices[0].delta.content
-                            message_placeholder.markdown(full_response + "▌")
+                    response_message = response.choices[0].message
+                    tool_calls = response_message.tool_calls
                     
-                    message_placeholder.markdown(full_response)
+                    # Logica Backstage: Se quiser ferramenta, nós abrimos a caixa e rodamos Python
+                    if tool_calls:
+                        # Append the assistant's intention locally to context array
+                        api_messages.append(response_message)
+                        
+                        for tool_call in tool_calls:
+                            function_name = tool_call.function.name
+                            function_to_call = AVAILABLE_TOOLS.get(function_name)
+                            if function_to_call:
+                                try:
+                                    function_args = json.loads(tool_call.function.arguments)
+                                    # Invoca
+                                    function_response = function_to_call(**function_args)
+                                    # Devolve pro modelo
+                                    api_messages.append({
+                                        "tool_call_id": tool_call.id,
+                                        "role": "tool",
+                                        "name": function_name,
+                                        "content": json.dumps(function_response, ensure_ascii=False)
+                                    })
+                                except Exception as e:
+                                    # Erro interno na execucao
+                                    api_messages.append({
+                                        "tool_call_id": tool_call.id,
+                                        "role": "tool",
+                                        "name": function_name,
+                                        "content": json.dumps({"erro": str(e)})
+                                    })
+                        
+                        # Segunda Chamada de Síntese
+                        second_response = client.chat.completions.create(
+                            model="gpt-4o-mini",
+                            messages=api_messages,
+                            stream=True
+                        )
+                        
+                        # Response Streaming final
+                        message_placeholder = st.empty()
+                        full_response = ""
+                        for chunk in second_response:
+                            if chunk.choices[0].delta.content:
+                                full_response += chunk.choices[0].delta.content
+                                message_placeholder.markdown(full_response + "▌")
+                        message_placeholder.markdown(full_response)
+                        
+                    else:
+                        # Nenhuma ferramenta acionada, foi resposta direta do conhecimento nativo
+                        message_placeholder = st.empty()
+                        message_placeholder.markdown(response_message.content)
+                        full_response = response_message.content
+                        
                 except Exception as ex:
-                    st.error(f"Ocorreu um erro na API: {ex}")
+                    st.error(f"Ocorreu um erro estrutural na API da IA: {ex}")
                     return
         
-        # Append historico final assistant
+        # Salva somento o Output humano no histórico de tela
         st.session_state.messages.append({"role": "assistant", "content": full_response})

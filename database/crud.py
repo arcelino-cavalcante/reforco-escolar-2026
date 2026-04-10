@@ -519,3 +519,60 @@ def salvar_contexto_ia(texto):
     db = get_db()
     db.collection('configuracoes').document('ia_contexto_personalizado').set({'diretrizes': texto})
     return 1
+
+# ==========================================
+# FERRAMENTAS PARA O ASSISTENTE DE IA (LLM TOOLS)
+# ==========================================
+def tool_listar_alunos(turma_nome="Todas"):
+    """Retorna lista simplificada de todos os alunos e em quais turmas estão."""
+    estudantes = listar_estudantes()
+    res = []
+    for e in estudantes:
+        if turma_nome == "Todas" or e.get('turma_nome', '').lower() == turma_nome.lower():
+            res.append({"nome": e.get('nome'), "turma": e.get('turma_nome'), "etapa": e.get('etapa_nome')})
+    return res
+
+def tool_listar_registros_mes(mes, ano):
+    """Retorna os diários de classe de um mês específico para analises globais. Extrai apenas os campos pedagogicamente relevantes."""
+    regs = listar_todos_registros_mes(mes, ano)
+    res = []
+    for r in regs:
+        res.append({
+            "data": r.get('data_registro'),
+            "aluno": r.get('estudante_nome'),
+            "compareceu": "Sim" if r.get('compareceu') == 1 else "Não",
+            "motivo_falta": r.get('motivo_falta'),
+            "habilidade": r.get('habilidade_trabalhada'),
+            "compreensao": compreensao_label(r.get('nivel_compreensao', 0)),
+            "dificuldade": r.get('dificuldade_latente'),
+            "emocional": r.get('estado_emocional'),
+            "atividade": r.get('tipo_atividade')
+        })
+    return res
+
+def tool_buscar_historico_aluno(nome_aluno_parcial):
+    """Busca o histórico pedagógico e de frequência de um aluno específico."""
+    estudantes = listar_estudantes()
+    alvo = None
+    for e in estudantes:
+        if nome_aluno_parcial.lower() in e.get('nome', '').lower():
+            alvo = e
+            break
+            
+    if not alvo:
+        return {"erro": f"Aluno contendo '{nome_aluno_parcial}' não encontrado."}
+        
+    regs = listar_registros_por_estudante(alvo['id'])
+    historico = []
+    for r in regs:
+        historico.append({
+            "data": r.get('data_registro'),
+            "compareceu": "Sim" if r.get('compareceu') == 1 else "Não - " + str(r.get('motivo_falta')),
+            "conteudo": r.get('origem_conteudo'),
+            "habilidade": r.get('habilidade_trabalhada'),
+            "compreensao": compreensao_label(r.get('nivel_compreensao', 0)),
+            "foco": r.get('participacao'),
+            "obs_prof_reforco": r.get('observacao')
+        })
+    return {"nome": alvo['nome'], "turma": alvo['turma_nome'], "historico_aulas": historico}
+
