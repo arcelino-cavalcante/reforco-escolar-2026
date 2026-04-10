@@ -61,6 +61,9 @@ def _doc_to_dict(doc):
 def _docs_to_list(docs):
     return [_doc_to_dict(doc) for doc in docs]
 
+def _clear_cache():
+    st.cache_data.clear()
+
 # ==========================================
 # ETAPAS
 # ==========================================
@@ -76,11 +79,13 @@ def criar_turma(nome, etapa_id):
     db = get_db()
     ref = db.collection('turmas').document()
     ref.set({'nome': nome, 'etapa_id': str(etapa_id)})
+    _clear_cache()
     return ref.id
 
 def atualizar_turma(id, nome, etapa_id):
     db = get_db()
     db.collection('turmas').document(str(id)).update({'nome': nome, 'etapa_id': str(etapa_id)})
+    _clear_cache()
     return 1
 
 @st.cache_data(ttl=15)
@@ -97,7 +102,13 @@ def listar_turmas(etapa_id=None):
 
 def excluir_turma(id):
     db = get_db()
+    # Cascading delete: remover estudantes desta turma
+    alunos = db.collection('estudantes').where('turma_id', '==', str(id)).get()
+    for doc in alunos:
+        db.collection('estudantes').document(doc.id).delete()
+    
     db.collection('turmas').document(str(id)).delete()
+    _clear_cache()
     return 1
 
 # ==========================================
@@ -107,11 +118,13 @@ def criar_estudante(nome, turma_id):
     db = get_db()
     ref = db.collection('estudantes').document()
     ref.set({'nome': nome, 'turma_id': str(turma_id), 'ativo': 1})
+    _clear_cache()
     return ref.id
 
 def atualizar_estudante(id, nome, turma_id):
     db = get_db()
     db.collection('estudantes').document(str(id)).update({'nome': nome, 'turma_id': str(turma_id)})
+    _clear_cache()
     return 1
 
 @st.cache_data(ttl=15)
@@ -133,6 +146,7 @@ def listar_estudantes(turma_id=None):
 def excluir_estudante(id):
     db = get_db()
     db.collection('estudantes').document(str(id)).delete()
+    _clear_cache()
     return 1
 
 # ==========================================
@@ -142,6 +156,7 @@ def criar_prof_reforco(nome, area, turmas_ids):
     db = get_db()
     ref = db.collection('professores_reforco').document()
     ref.set({'nome': nome, 'area': area, 'turmas_ids': [str(x) for x in turmas_ids]})
+    _clear_cache()
     return ref.id
 
 def atualizar_prof_reforco(prof_id, nome, area, turmas_ids):
@@ -149,6 +164,7 @@ def atualizar_prof_reforco(prof_id, nome, area, turmas_ids):
     db.collection('professores_reforco').document(str(prof_id)).update({
         'nome': nome, 'area': area, 'turmas_ids': [str(x) for x in turmas_ids]
     })
+    _clear_cache()
     return 1
 
 @st.cache_data(ttl=15)
@@ -164,6 +180,7 @@ def obter_turmas_prof_reforco(prof_id):
 def excluir_prof_reforco(id):
     db = get_db()
     db.collection('professores_reforco').document(str(id)).delete()
+    _clear_cache()
     return 1
 
 # ==========================================
@@ -173,6 +190,7 @@ def criar_prof_regente(nome, area, turmas_ids):
     db = get_db()
     ref = db.collection('professores_regentes').document()
     ref.set({'nome': nome, 'area': area, 'turmas_ids': [str(x) for x in turmas_ids]})
+    _clear_cache()
     return ref.id
 
 def atualizar_prof_regente(prof_id, nome, area, turmas_ids):
@@ -180,6 +198,7 @@ def atualizar_prof_regente(prof_id, nome, area, turmas_ids):
     db.collection('professores_regentes').document(str(prof_id)).update({
         'nome': nome, 'area': area, 'turmas_ids': [str(x) for x in turmas_ids]
     })
+    _clear_cache()
     return 1
 
 @st.cache_data(ttl=15)
@@ -195,6 +214,7 @@ def obter_turmas_prof_regente(prof_id):
 def excluir_prof_regente(id):
     db = get_db()
     db.collection('professores_regentes').document(str(id)).delete()
+    _clear_cache()
     return 1
 
 # ==========================================
@@ -223,6 +243,7 @@ def criar_registro_diario(estudante_id, prof_id, data_registro, bimestre, prof_r
         'tipo_atividade': tipo_atividade,
         'estado_emocional': estado_emocional
     })
+    _clear_cache()
     return ref.id
 
 def atualizar_registro_diario(id_reg, compareceu, motivo_falta, origem_conteudo, habilidade_trabalhada, nivel_compreensao="Não Avaliado", participacao=None, observacao=None, dificuldade_latente=None, tipo_atividade=None, estado_emocional=None):
@@ -235,6 +256,7 @@ def atualizar_registro_diario(id_reg, compareceu, motivo_falta, origem_conteudo,
         'tipo_atividade': tipo_atividade,
         'estado_emocional': estado_emocional
     })
+    _clear_cache()
     return 1
 
 def _build_registros_diarios(regs):
@@ -320,6 +342,7 @@ def criar_consolidado_mensal(estudante_id, prof_id, prof_regente_id, data_regist
         'parecer_evolutivo': parecer_evolutivo, 'observacao_geral': observacao_geral,
         'recomendacao_alta': recomendacao_alta, 'acao_pedagogica': acao_pedagogica
     })
+    _clear_cache()
     return ref.id
 
 def atualizar_consolidado_mensal(id_resumo, data_registro,
@@ -334,6 +357,7 @@ def atualizar_consolidado_mensal(id_resumo, data_registro,
         'parecer_evolutivo': parecer_evolutivo, 'observacao_geral': observacao_geral,
         'recomendacao_alta': recomendacao_alta, 'acao_pedagogica': acao_pedagogica
     })
+    _clear_cache()
     return 1
 
 # ==========================================
@@ -420,6 +444,7 @@ def criar_encaminhamento(estudante_id, regente_id, alvo_area, habilidade_foco, o
         'observacao': observacao, 'data_solicitacao': data_solicitacao,
         'status': 'PENDENTE'
     })
+    _clear_cache()
     return ref.id
 
 def obter_encaminhamentos_pendentes(estudante_id, area_prof):
@@ -442,11 +467,13 @@ def concluir_encaminhamento(encaminhamento_id, resposta=None):
     update_data = {'status': 'ATENDIDO_PELO_REFORCO'}
     if resposta: update_data['resposta_reforco'] = resposta
     db.collection('encaminhamentos').document(str(encaminhamento_id)).update(update_data)
+    _clear_cache()
     return 1
 
 def marcar_encaminhamento_lido_regente(encaminhamento_id):
     db = get_db()
     db.collection('encaminhamentos').document(str(encaminhamento_id)).update({'status': 'LIDO_PELO_REGENTE'})
+    _clear_cache()
     return 1
 
 def listar_encaminhamentos_enviados_estudante(estudante_id, regente_id):
