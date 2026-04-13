@@ -459,13 +459,14 @@ def obter_estatisticas_reforco(prof_id):
     stats['qtd_total_estudantes'] = sum(1 for e in estudantes if e.get('turma_id') in t_ids)
     
     hoje = datetime.date.today()
-    uma_sem = hoje - datetime.timedelta(days=7)
-    q = db.collection('registros_diarios').where('prof_id','==',str(prof_id)).where('data_registro','>=',uma_sem.isoformat()).get()
+    uma_sem = (hoje - datetime.timedelta(days=7)).isoformat()
+    # Query simples por prof_id (sem composite index) + filtro de data no Python
+    q = db.collection('registros_diarios').where('prof_id', '==', str(prof_id)).get()
     
     atendidos = set()
     for doc in q:
         d = doc.to_dict()
-        if d.get('compareceu') == 1:
+        if d.get('data_registro', '') >= uma_sem and d.get('compareceu') == 1:
             atendidos.add(d.get('estudante_id'))
     stats['qtd_atendidos_semana'] = len(atendidos)
     return stats
@@ -578,8 +579,11 @@ def listar_registros_diarios_trinta_dias(prof_id, turma_id):
     db = get_db()
     import datetime
     t_30 = (datetime.date.today() - datetime.timedelta(days=30)).isoformat()
-    q = db.collection('registros_diarios').where('prof_id', '==', str(prof_id)).where('data_registro','>=', t_30).get()
+    # Query simples por prof_id (sem composite index) + filtro de data no Python
+    q = db.collection('registros_diarios').where('prof_id', '==', str(prof_id)).get()
     regs = _docs_to_list(q)
+    # Filtrar por data e turma no Python
+    regs = [r for r in regs if r.get('data_registro', '') >= t_30]
     target_estudantes = [e['id'] for e in listar_estudantes(str(turma_id))]
     regs = [r for r in regs if r.get('estudante_id') in target_estudantes]
     return sorted(_build_registros_diarios(regs), key=lambda x: x.get('data_registro',''), reverse=True)
