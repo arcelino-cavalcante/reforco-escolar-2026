@@ -5,3 +5,5 @@ pandas
 plotly
 openai
 httpx
+fpdf2
+openpyxl

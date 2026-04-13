@@ -7,6 +7,7 @@ from database.crud import (
     compreensao_label, compreensao_emoji
 )
 from utils.styles import page_header
+from utils.export_utils import gerar_pdf_aluno_regente
 
 def render():
     page_header("👩‍🏫 Painel da Turma - Visão Regente", "Acompanhe todo o trajeto dos seus alunos no Reforço em tempo real.")
@@ -81,6 +82,28 @@ def render():
                 
                 # Exibir um expander pra cada criança com a badge da qtd de diários
                 with st.expander(f"🧑‍🎓 {nome_aluno_str}  —  ({len(historico_aluno)} lançamentos)"):
+                    
+                    # Botão de Exportação PDF do aluno
+                    try:
+                        turma_nome_aluno = historico_aluno[0].get('turma_nome', '') if historico_aluno else ''
+                        pdf_bytes = gerar_pdf_aluno_regente(
+                            nome_aluno=nome_aluno_str,
+                            turma_nome=turma_nome_aluno,
+                            historico_aulas=historico_aluno,
+                            consolidados=consolidados_aluno
+                        )
+                        nome_arq = f"relatorio_{nome_aluno_str.replace(' ', '_')}.pdf"
+                        st.download_button(
+                            label=f"📥 Exportar Relatório PDF",
+                            data=pdf_bytes,
+                            file_name=nome_arq,
+                            mime="application/pdf",
+                            key=f"pdf_{a_id}",
+                            use_container_width=True,
+                            type="secondary"
+                        )
+                    except Exception:
+                        pass
                     
                     if consolidados_aluno:
                         st.markdown("#### 📋 Fechamento Bimestral (Conselho de Reforço)")

@@ -3,6 +3,7 @@ import datetime
 import pandas as pd
 from database.crud import listar_todos_registros_mes
 from utils.styles import page_header
+from utils.export_utils import gerar_excel_auditoria
 
 def render():
     page_header("🔍 Auditoria de Registros", "Filtre e analise todo o fluxo de preenchimento diário do mês.")
@@ -81,10 +82,31 @@ def render():
         'etapa_nome': 'Etapa',
         'turma_nome': 'Turma',
         'prof_nome': 'Professor(a) Reforço',
+        'prof_regente_nome': 'Professor(a) Regente',
         'Status': 'Status',
         'Anotação do Dia': 'Anotação do Dia'
     }
     
+    # Garantir que a coluna existe (registros antigos podem não ter)
+    if 'prof_regente_nome' not in df_exibicao.columns:
+        df_exibicao['prof_regente_nome'] = ''
+    df_exibicao['prof_regente_nome'] = df_exibicao['prof_regente_nome'].fillna('—')
+    
     df_clean = df_exibicao[list(colunas_finais.keys())].rename(columns=colunas_finais)
     
     st.dataframe(df_clean, use_container_width=True, hide_index=True)
+    
+    # Botão de Exportação Excel
+    try:
+        excel_bytes = gerar_excel_auditoria(df_clean)
+        nome_arq = f"auditoria_registros_{mes_f:02d}_{ano_f}.xlsx"
+        st.download_button(
+            label="📥 Exportar Excel",
+            data=excel_bytes,
+            file_name=nome_arq,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+            type="secondary"
+        )
+    except Exception as e:
+        st.error(f"Erro ao gerar Excel: {e}")

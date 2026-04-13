@@ -3,8 +3,57 @@ import json
 import datetime
 import httpx
 from openai import OpenAI
-from database.crud import obter_contexto_ia, tool_listar_alunos, tool_listar_registros_mes, tool_buscar_historico_aluno
+from database.crud import (
+    obter_contexto_ia, tool_listar_alunos, tool_listar_registros_mes,
+    tool_buscar_historico_aluno, listar_estudantes, listar_todos_registros_diarios_ultimos_dias
+)
 from utils.styles import page_header
+
+
+# ==========================================
+# GERAÇÃO DO CONTEXTO CSV COMPRIMIDO PARA O CÉREBRO DA IA
+# ==========================================
+def build_data_context_text() -> str:
+    """
+    Gera um resumo ultra-comprimido em formato CSV dos dados da escola.
+    Usado pelo painel 'Cérebro da IA' para exibir o contexto que a IA lê.
+    Janela de dados: últimos 30 dias de registros.
+    """
+    linhas = []
+
+    # === BLOCO 1: ALUNOS ATIVOS ===
+    linhas.append("# ALUNOS")
+    linhas.append("nome,turma,etapa")
+    try:
+        alunos = listar_estudantes()
+        for a in alunos:
+            nome = str(a.get('nome', '')).replace(',', ';')
+            turma = str(a.get('turma_nome', '')).replace(',', ';')
+            etapa = str(a.get('etapa_nome', '')).replace(',', ';')
+            linhas.append(f"{nome},{turma},{etapa}")
+    except Exception as e:
+        linhas.append(f"ERRO,{e},")
+
+    linhas.append("")
+
+    # === BLOCO 2: REGISTROS DIÁRIOS (ÚLTIMOS 30 DIAS) ===
+    linhas.append("# REGISTROS_ULTIMOS_30_DIAS")
+    linhas.append("data,aluno,compareceu,habilidade,compreensao,emocional,dificuldade")
+    try:
+        registros = listar_todos_registros_diarios_ultimos_dias(dias=30)
+        for r in registros:
+            data = str(r.get('data_registro', ''))
+            aluno = str(r.get('estudante_nome', '')).replace(',', ';')
+            compareceu = 'Sim' if r.get('compareceu') == 1 else 'Não'
+            habilidade = str(r.get('habilidade_trabalhada', '') or '').replace(',', ';')
+            compreensao = str(r.get('nivel_compreensao', '') or '').replace(',', ';')
+            emocional = str(r.get('estado_emocional', '') or '').replace(',', ';')
+            dificuldade = str(r.get('dificuldade_latente', '') or '').replace(',', ';')
+            linhas.append(f"{data},{aluno},{compareceu},{habilidade},{compreensao},{emocional},{dificuldade}")
+    except Exception as e:
+        linhas.append(f"ERRO,{e},,,,,")
+
+    return "\n".join(linhas)
 
 # ==========================================
 # DEFINIÇÃO DAS TOOLS PARA A API OPENAI
@@ -161,49 +210,91 @@ def render():
                         messages=api_messages,
                         tools=TOOLS_SCHEMA,
                         tool_choice="auto",
+                        stream=True
                     )
                     
-                    response_message = response.choices[0].message
-                    tool_calls = response_message.tool_calls
+                    # Processar streaming da primeira chamada
+                    collected_content = ""
+                    tool_calls_data = {}
+                    first_response_role = "assistant"
                     
-                    # Logica Backstage: Se quiser ferramenta, nós abrimos a caixa e rodamos Python
-                    if tool_calls:
-                        # Append the assistant's intention locally to context array
-                        api_messages.append(response_message)
+                    message_placeholder = st.empty()
+                    
+                    for chunk in response:
+                        delta = chunk.choices[0].delta
                         
-                        for tool_call in tool_calls:
-                            function_name = tool_call.function.name
+                        # Se tem conteúdo textual, exibir em streaming
+                        if delta.content:
+                            collected_content += delta.content
+                            message_placeholder.markdown(collected_content + "▌")
+                        
+                        # Se tem tool_calls, acumular
+                        if delta.tool_calls:
+                            for tc in delta.tool_calls:
+                                idx = tc.index
+                                if idx not in tool_calls_data:
+                                    tool_calls_data[idx] = {"id": "", "name": "", "arguments": ""}
+                                if tc.id:
+                                    tool_calls_data[idx]["id"] = tc.id
+                                if tc.function and tc.function.name:
+                                    tool_calls_data[idx]["name"] = tc.function.name
+                                if tc.function and tc.function.arguments:
+                                    tool_calls_data[idx]["arguments"] += tc.function.arguments
+                    
+                    # Se houve tool_calls, processar
+                    if tool_calls_data:
+                        message_placeholder.empty()
+                        
+                        # Reconstruir a mensagem do assistant com tool_calls para o contexto
+                        from openai.types.chat import ChatCompletionMessage, ChatCompletionMessageToolCall
+                        from openai.types.chat.chat_completion_message_tool_call import Function
+                        
+                        reconstructed_tool_calls = []
+                        for idx in sorted(tool_calls_data.keys()):
+                            tc_data = tool_calls_data[idx]
+                            reconstructed_tool_calls.append(
+                                ChatCompletionMessageToolCall(
+                                    id=tc_data["id"],
+                                    type="function",
+                                    function=Function(name=tc_data["name"], arguments=tc_data["arguments"])
+                                )
+                            )
+                        
+                        assistant_msg = ChatCompletionMessage(
+                            role="assistant",
+                            content=collected_content or None,
+                            tool_calls=reconstructed_tool_calls
+                        )
+                        api_messages.append(assistant_msg)
+                        
+                        for tc_data in tool_calls_data.values():
+                            function_name = tc_data["name"]
                             function_to_call = AVAILABLE_TOOLS.get(function_name)
                             if function_to_call:
                                 try:
-                                    function_args = json.loads(tool_call.function.arguments)
-                                    # Invoca
+                                    function_args = json.loads(tc_data["arguments"])
                                     function_response = function_to_call(**function_args)
-                                    # Devolve pro modelo
                                     api_messages.append({
-                                        "tool_call_id": tool_call.id,
+                                        "tool_call_id": tc_data["id"],
                                         "role": "tool",
                                         "name": function_name,
                                         "content": json.dumps(function_response, ensure_ascii=False)
                                     })
                                 except Exception as e:
-                                    # Erro interno na execucao
                                     api_messages.append({
-                                        "tool_call_id": tool_call.id,
+                                        "tool_call_id": tc_data["id"],
                                         "role": "tool",
                                         "name": function_name,
                                         "content": json.dumps({"erro": str(e)})
                                     })
                         
-                        # Segunda Chamada de Síntese
+                        # Segunda Chamada de Síntese (com streaming)
                         second_response = client.chat.completions.create(
                             model="gpt-4o-mini",
                             messages=api_messages,
                             stream=True
                         )
                         
-                        # Response Streaming final
-                        message_placeholder = st.empty()
                         full_response = ""
                         for chunk in second_response:
                             if chunk.choices[0].delta.content:
@@ -212,10 +303,9 @@ def render():
                         message_placeholder.markdown(full_response)
                         
                     else:
-                        # Nenhuma ferramenta acionada, foi resposta direta do conhecimento nativo
-                        message_placeholder = st.empty()
-                        message_placeholder.markdown(response_message.content)
-                        full_response = response_message.content
+                        # Resposta direta com streaming (sem ferramentas)
+                        message_placeholder.markdown(collected_content)
+                        full_response = collected_content
                         
                 except Exception as ex:
                     st.error(f"Ocorreu um erro estrutural na API da IA: {ex}")

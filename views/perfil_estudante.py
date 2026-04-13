@@ -7,6 +7,7 @@ from database.crud import (
     compreensao_para_nota, compreensao_label, compreensao_emoji
 )
 from utils.styles import page_header
+from utils.export_utils import gerar_pdf_dossie_estudante
 
 def render():
     page_header("🧑‍🎓 Dossiê do Estudante", "Prontuário completo, contínuo e analítico do aluno no apoio ao Reforço.")
@@ -48,8 +49,54 @@ def render():
         st.info("Nenhum registro de participação em reforço escolar localizado para este(a) estudante.")
         return
 
+    # Filtro por Período
+    st.subheader("2. Filtrar Período")
+    cf1, cf2, cf3 = st.columns(3)
+    with cf1:
+        bim_filtro = st.selectbox("Bimestre:", ["Todos", "I", "II", "III", "IV"], key="dossie_bim")
+    with cf2:
+        data_inicio = st.date_input("Data Início (opcional):", value=None, key="dossie_dt_ini")
+    with cf3:
+        data_fim = st.date_input("Data Fim (opcional):", value=None, key="dossie_dt_fim")
+
+    # Aplicar filtros
+    if bim_filtro != "Todos":
+        historico_diario = [r for r in historico_diario if r.get('bimestre') == bim_filtro]
+        historico_mensal = [c for c in historico_mensal if c.get('bimestre') == bim_filtro]
+    if data_inicio:
+        historico_diario = [r for r in historico_diario if r.get('data_registro', '') >= data_inicio.isoformat()]
+    if data_fim:
+        historico_diario = [r for r in historico_diario if r.get('data_registro', '') <= data_fim.isoformat()]
+
+    if not historico_diario and not historico_mensal:
+        st.info("Nenhum registro encontrado para o período selecionado.")
+        return
+
+    # Botão de Exportação PDF
+    aluno_info = next((e for e in estudantes_turma if e['id'] == aluno_id_sel), {})
+    etapa_aluno = aluno_info.get('etapa_nome', '')
+    try:
+        pdf_bytes = gerar_pdf_dossie_estudante(
+            nome_aluno=aluno_sel_nome,
+            turma_nome=turma_sel_nome.split(' (')[0],
+            etapa_nome=etapa_aluno,
+            historico_diario=historico_diario,
+            historico_mensal=historico_mensal
+        )
+        nome_arq = f"dossie_{aluno_sel_nome.replace(' ', '_')}_{datetime.date.today().isoformat()}.pdf"
+        st.download_button(
+            label="📥 Exportar Dossiê em PDF",
+            data=pdf_bytes,
+            file_name=nome_arq,
+            mime="application/pdf",
+            use_container_width=True,
+            type="secondary"
+        )
+    except Exception as e:
+        st.error(f"Erro ao gerar PDF: {e}")
+
     # 3. Painel de Métricas (Dashboard Individual)
-    st.subheader(f"📊 Panorama Geral: {aluno_sel_nome}")
+    st.subheader(f"📊 Panorama: {aluno_sel_nome} {'(Bim ' + bim_filtro + ')' if bim_filtro != 'Todos' else '(Geral)'}")
 
     df_d = pd.DataFrame(historico_diario)
     

@@ -2,7 +2,7 @@ import streamlit as st
 import datetime
 from database.crud import (
     listar_estudantes, obter_turmas_prof_reforco, listar_turmas,
-    criar_registro_diario, atualizar_registro_diario,
+    criar_registro_diario, atualizar_registro_diario, excluir_registro_diario,
     listar_registros_diarios, listar_profs_reforco, 
     obter_regente_por_turma_e_area, obter_encaminhamentos_pendentes, concluir_encaminhamento,
     contar_presencas_estudante
@@ -205,15 +205,33 @@ def render():
                                 st.rerun()
                     st.divider()
 
-                col_txt, col_btn = st.columns([10, 2])
+                col_txt, col_btn_edit, col_btn_del = st.columns([10, 1, 1])
                 
                 if c_bool:
                     col_txt.markdown(f"*Lançado:* {reg['origem_conteudo']} - **{reg['habilidade_trabalhada']}**")
                 else:
                     col_txt.markdown(f"*(Falta: {reg['motivo_falta']})*")
                     
-                if col_btn.button("✏️ Editar", key=f"btn_edit_{reg['id']}", use_container_width=True):
+                if col_btn_edit.button("✏️ Editar", key=f"btn_edit_{reg['id']}", use_container_width=True):
                     st.session_state.editando_rd = reg['id']
+                    st.session_state.pop('confirmando_exclusao_rd', None)
+                    st.rerun()
+                
+                if col_btn_del.button("🗑️", key=f"btn_del_{reg['id']}", use_container_width=True):
+                    st.session_state.confirmando_exclusao_rd = reg['id']
+                    st.session_state.editando_rd = None
+                    st.rerun()
+
+            # Confirmação de exclusão
+            if st.session_state.get('confirmando_exclusao_rd') == reg['id']:
+                st.warning(f"⚠️ Tem certeza que deseja **excluir** o registro de **{reg['estudante_nome']}** ({reg.get('data_registro', '')})? Esta ação é irreversível.")
+                col_conf_s, col_conf_n = st.columns(2)
+                if col_conf_s.button("✅ Sim, excluir", key=f"conf_del_{reg['id']}", type="primary", use_container_width=True):
+                    excluir_registro_diario(reg['id'])
+                    st.session_state.confirmando_exclusao_rd = None
+                    st.rerun()
+                if col_conf_n.button("❌ Cancelar", key=f"canc_del_{reg['id']}", use_container_width=True):
+                    st.session_state.confirmando_exclusao_rd = None
                     st.rerun()
 
             # Painel de Edição Expansivo

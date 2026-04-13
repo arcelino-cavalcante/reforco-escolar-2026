@@ -148,7 +148,7 @@ def atualizar_estudante(id, nome, turma_id):
     return 1
 
 @st.cache_data(ttl=15)
-def listar_estudantes(turma_id=None):
+def listar_estudantes(turma_id=None, incluir_inativos=False):
     db = get_db()
     turmas_dict = {t['id']: t for t in listar_turmas()}
     query = db.collection('estudantes')
@@ -156,6 +156,9 @@ def listar_estudantes(turma_id=None):
     estudos = _docs_to_list(query.get())
     res = []
     for est in estudos:
+        # Filtrar inativos por padrão
+        if not incluir_inativos and est.get('ativo', 1) != 1:
+            continue
         t_id = est.get('turma_id')
         t_info = turmas_dict.get(t_id, {})
         est['turma_nome'] = t_info.get('nome', '')
@@ -166,6 +169,20 @@ def listar_estudantes(turma_id=None):
 def excluir_estudante(id):
     db = get_db()
     db.collection('estudantes').document(str(id)).delete()
+    _clear_cache()
+    return 1
+
+def desativar_estudante(id):
+    """Desativa um estudante (alta do reforço)."""
+    db = get_db()
+    db.collection('estudantes').document(str(id)).update({'ativo': 0})
+    _clear_cache()
+    return 1
+
+def reativar_estudante(id):
+    """Reativa um estudante que retorna ao reforço."""
+    db = get_db()
+    db.collection('estudantes').document(str(id)).update({'ativo': 1})
     _clear_cache()
     return 1
 
@@ -249,8 +266,20 @@ def obter_regente_por_turma_e_area(turma_id, area_disciplina):
             return d
     return None
 
+def verificar_registro_duplicado(estudante_id, prof_id, data_registro):
+    """Verifica se já existe registro para o mesmo aluno+professor+data."""
+    db = get_db()
+    q = db.collection('registros_diarios') \
+        .where('estudante_id', '==', str(estudante_id)) \
+        .where('prof_id', '==', str(prof_id)) \
+        .where('data_registro', '==', data_registro).get()
+    return len(list(q)) > 0
+
 def criar_registro_diario(estudante_id, prof_id, data_registro, bimestre, prof_regente_id, compareceu, motivo_falta, origem_conteudo, habilidade_trabalhada, nivel_compreensao="Não Avaliado", participacao=None, observacao=None, dificuldade_latente=None, tipo_atividade=None, estado_emocional=None):
     db = get_db()
+    # Validação de duplicata
+    if verificar_registro_duplicado(estudante_id, prof_id, data_registro):
+        return None  # Retorna None para indicar duplicata
     ref = db.collection('registros_diarios').document()
     ref.set({
         'estudante_id': str(estudante_id), 'prof_id': str(prof_id),
@@ -279,9 +308,17 @@ def atualizar_registro_diario(id_reg, compareceu, motivo_falta, origem_conteudo,
     _clear_cache()
     return 1
 
+def excluir_registro_diario(id_reg):
+    """Remove um registro diário do banco de dados."""
+    db = get_db()
+    db.collection('registros_diarios').document(str(id_reg)).delete()
+    _clear_cache()
+    return 1
+
 def _build_registros_diarios(regs):
-    estudantes_map = {e['id']: e for e in listar_estudantes()}
+    estudantes_map = {e['id']: e for e in listar_estudantes(incluir_inativos=True)}
     profs_reforco_map = {p['id']: p for p in listar_profs_reforco()}
+    profs_regentes_map = {p['id']: p for p in listar_profs_regentes()}
     for r in regs:
         est = estudantes_map.get(r.get('estudante_id'), {})
         r['estudante_nome'] = est.get('nome', '')
@@ -293,6 +330,9 @@ def _build_registros_diarios(regs):
         r['prof_reforco_area'] = pref.get('area', '')
         r['prof_nome'] = pref.get('nome', '')
         r['prof_area'] = pref.get('area', '')
+        # Nome do professor regente vinculado
+        preg = profs_regentes_map.get(r.get('prof_regente_id'), {})
+        r['prof_regente_nome'] = preg.get('nome', '')
     return regs
 
 def listar_registros_diarios(data_registro, prof_id):
@@ -502,6 +542,37 @@ def listar_encaminhamentos_enviados_estudante(estudante_id, regente_id):
         .where('estudante_id', '==', str(estudante_id)) \
         .where('regente_id', '==', str(regente_id)).get()
     return sorted(_docs_to_list(q), key=lambda x: x.get('data_solicitacao',''), reverse=True)
+
+def contar_notificacoes_reforco(prof_id):
+    """Conta encaminhamentos PENDENTES direcionados à área do professor de reforço nas turmas dele."""
+    db = get_db()
+    prof_doc = db.collection('professores_reforco').document(str(prof_id)).get()
+    if not prof_doc.exists:
+        return 0
+    prof_data = prof_doc.to_dict()
+    area = prof_data.get('area', '')
+    
+    q = db.collection('encaminhamentos').where('alvo_area', '==', area).where('status', '==', 'PENDENTE').get()
+    
+    turmas_prof = prof_data.get('turmas_ids', [])
+    estudantes_map = {e['id']: e for e in listar_estudantes()}
+    
+    count = 0
+    for doc in q:
+        d = doc.to_dict()
+        est_id = d.get('estudante_id')
+        est = estudantes_map.get(est_id, {})
+        if est.get('turma_id') in turmas_prof:
+            count += 1
+    return count
+
+def contar_notificacoes_regente(prof_id):
+    """Conta encaminhamentos com status ATENDIDO_PELO_REFORCO (respostas não lidas pelo regente)."""
+    db = get_db()
+    q = db.collection('encaminhamentos') \
+        .where('regente_id', '==', str(prof_id)) \
+        .where('status', '==', 'ATENDIDO_PELO_REFORCO').get()
+    return len(list(q))
 
 def listar_registros_diarios_trinta_dias(prof_id, turma_id):
     db = get_db()

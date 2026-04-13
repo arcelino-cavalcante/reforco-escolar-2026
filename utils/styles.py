@@ -60,18 +60,19 @@ def aplicar_estilos():
         
         <script>
             // Registro de Manifesto PWA via injeção JS dinâmica
+            // O Streamlit serve arquivos de .streamlit/static/ na URL /app/static/
             if (!document.getElementById('pwa-manifest')) {
                 var link = document.createElement('link');
                 link.id = 'pwa-manifest';
                 link.rel = 'manifest';
-                link.href = './pwa/manifest.json';
+                link.href = './app/static/manifest.json';
                 document.getElementsByTagName('head')[0].appendChild(link);
             }
 
             // Registro do Service Worker
             if ('serviceWorker' in navigator) {
                 window.addEventListener('load', function() {
-                    navigator.serviceWorker.register('./pwa/sw.js').then(function(registration) {
+                    navigator.serviceWorker.register('./app/static/sw.js', {scope: '/'}).then(function(registration) {
                         console.log('ServiceWorker registration successful with scope: ', registration.scope);
                     }, function(err) {
                         console.log('ServiceWorker registration failed: ', err);

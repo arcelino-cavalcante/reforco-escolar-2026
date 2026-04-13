@@ -1,7 +1,7 @@
 import streamlit as st
 from streamlit_option_menu import option_menu
 from database.connection import init_db
-from database.crud import listar_profs_reforco, listar_profs_regentes
+from database.crud import listar_profs_reforco, listar_profs_regentes, contar_notificacoes_reforco, contar_notificacoes_regente
 from utils.styles import aplicar_estilos
 
 # ===== CONFIGURAÇÃO DA PÁGINA =====
@@ -133,14 +133,27 @@ else:
     with st.sidebar:
         st.title("📚 Reforço Escolar")
         
+        # === Contagem de Notificações ===
+        notif_count = 0
+        if st.session_state.perfil == "reforco" and st.session_state.prof_id:
+            notif_count = contar_notificacoes_reforco(st.session_state.prof_id)
+        elif st.session_state.perfil == "regente" and st.session_state.prof_id:
+            notif_count = contar_notificacoes_regente(st.session_state.prof_id)
+        
         if st.session_state.perfil == "reforco":
             st.caption(f"Reforço: **{st.session_state.prof_nome}**")
-            options = ["Dashboard", "Registro Diário", "Registro Mensal", "Histórico de Registros"]
+            if notif_count > 0:
+                st.markdown(f"🔔 **{notif_count} pedido{'s' if notif_count > 1 else ''} de regente{'s' if notif_count > 1 else ''} pendente{'s' if notif_count > 1 else ''}**")
+            label_diario = f"Registro Diário ({notif_count})" if notif_count > 0 else "Registro Diário"
+            options = ["Dashboard", label_diario, "Registro Mensal", "Histórico de Registros"]
             icons = ["bar-chart", "journal-text", "calendar-check", "clock-history"]
             
         elif st.session_state.perfil == "regente":
             st.caption(f"Regente: **{st.session_state.prof_nome}**")
-            options = ["Painel da Turma", "Relatório de Evolução"]
+            if notif_count > 0:
+                st.markdown(f"🔔 **{notif_count} resposta{'s' if notif_count > 1 else ''} do reforço não lida{'s' if notif_count > 1 else ''}**")
+            label_painel = f"Painel da Turma ({notif_count})" if notif_count > 0 else "Painel da Turma"
+            options = [label_painel, "Relatório de Evolução"]
             icons = ["people", "graph-up"]
             
         else:
@@ -172,7 +185,7 @@ else:
         render()
     
     # Roteamento Reforço
-    elif selected == "Registro Diário":
+    elif selected.startswith("Registro Diário"):
         from views.registro_diario import render
         render()
 
@@ -185,13 +198,13 @@ else:
         render()
         
     # Roteamento Regente
-    elif selected == "Painel da Turma":
+    elif selected.startswith("Painel da Turma"):
         from views.painel_regente import render
         render()
 
     elif selected == "Relatório de Evolução":
-        st.header("Relatório de Evolução")
-        st.info("Visão de gráficos ainda em construção para o Prof. Regente.")
+        from views.relatorio_evolucao_regente import render
+        render()
 
     elif selected == "Ver Registros":
         from views.ver_registros import render

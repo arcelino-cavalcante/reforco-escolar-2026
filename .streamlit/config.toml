@@ -11,5 +11,8 @@ font = "sans serif"
 toolbarMode = "minimal"
 showSidebarNavigation = false
 
+[server]
+enableStaticServing = true
+
 [ui]
 hideTopBar = true
