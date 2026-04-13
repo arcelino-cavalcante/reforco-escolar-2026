@@ -9,11 +9,11 @@ from database.crud import (
 )
 from utils.styles import page_header
 
-HABILIDADES_MATEMATICA = ["Adição e Subtração", "Multiplicação e Divisão", "Frações e Decimais", "Resolução de Problemas", "Geometria", "Estatística Básica / Gráficos", "Sistema Monetário", "Outro"]
+HABILIDADES_MATEMATICA = ["Adição", "Subtração", "Divisão", "Multiplicação", "Resolução de problemas simples", "Outro"]
 HABILIDADES_PORTUGUES = ["Leitura e Compreensão Textual", "Produção de Texto (Escrita)", "Ortografia e Gramática", "Fluência Leitora", "Caligrafia e Traçado", "Interpretação Avançada", "Vocabulário", "Outro"]
 MOTIVOS_FALTA = ["Atestado Médico / Doença", "Problema de Transporte", "Falta do Professor (Sua falta)", "Feriado / Recesso", "Esqueceu do Reforço", "Evento na Escola", "Outro Motivo"]
 NIVEIS_ENGAJAMENTO = ["Muito Focado e Participativo", "Participação Regular", "Desatento / Disperso", "Agitado / Inquieto", "Recusou-se a Realizar Tarefas"]
-TIPOS_ATIVIDADE = ["Exercício no Caderno / Apostila", "Atividade Lúdica / Jogo", "Leitura Orientada", "Atividade em Grupo", "Uso de Tecnologia / Computador", "Avaliação / Teste", "Outro"]
+TIPOS_ATIVIDADE = ["Impressa", "Atividade Lúdica", "Jogo", "Atividade em Grupo", "Outro"]
 ESTADOS_EMOCIONAIS = ["Não Observado", "Tranquilo / Calmo", "Triste / Apático", "Irritado / Frustrado", "Ansioso", "Eufórico / Muito Agitado"]
 
 def render():
@@ -107,16 +107,23 @@ def render():
                     
                     if area_prof == "Matemática":
                         hab_opcoes = HABILIDADES_MATEMATICA
-                    elif area_prof == "Português":
-                        hab_opcoes = HABILIDADES_PORTUGUES
+                        hab_sel = st.multiselect(f"Qual habilidade de Matemática? (Pode escolher mais de uma) *", hab_opcoes)
+                        if "Outro" in hab_sel:
+                            hab_conteudo_outro = st.text_input("Especifique a Habilidade *")
+                            hab_conteudo = ", ".join([h for h in hab_sel if h != "Outro"] + ([hab_conteudo_outro] if hab_conteudo_outro else []))
+                        else:
+                            hab_conteudo = ", ".join(hab_sel)
                     else:
-                        hab_opcoes = ["Geral", "Outro"]
-                        
-                    hab_sel = st.selectbox(f"Qual habilidade de {area_prof}? *", hab_opcoes)
-                    if hab_sel == "Outro":
-                        hab_conteudo = st.text_input("Especifique a Habilidade *")
-                    else:
-                        hab_conteudo = hab_sel
+                        if area_prof == "Português":
+                            hab_opcoes = HABILIDADES_PORTUGUES
+                        else:
+                            hab_opcoes = ["Geral", "Outro"]
+                            
+                        hab_sel = st.selectbox(f"Qual habilidade de {area_prof}? *", hab_opcoes)
+                        if hab_sel == "Outro":
+                            hab_conteudo = st.text_input("Especifique a Habilidade *")
+                        else:
+                            hab_conteudo = hab_sel
                     
                     c_t, c_e = st.columns(2)
                     with c_t:
@@ -259,21 +266,36 @@ def render():
                         idx_ori = ["Conteúdo base do Reforço", "Conteúdo da Sala de Aula"].index(reg['origem_conteudo']) if reg['origem_conteudo'] in ["Conteúdo base do Reforço", "Conteúdo da Sala de Aula"] else 0
                         e_ori = st.selectbox("Origem?", ["Conteúdo base do Reforço", "Conteúdo da Sala de Aula"], index=idx_ori, key=f"o_{reg['id']}")
                         
+                        h_atual = reg['habilidade_trabalhada'] if reg['habilidade_trabalhada'] else ""
+                        
                         if area_prof == "Matemática":
                             hab_opcoes_e = HABILIDADES_MATEMATICA
-                        elif area_prof == "Português":
-                            hab_opcoes_e = HABILIDADES_PORTUGUES
+                            h_atual_list = [h.strip() for h in h_atual.split(",")] if h_atual else []
+                            default_sel = [h for h in h_atual_list if h in hab_opcoes_e]
+                            has_outro = any(h for h in h_atual_list if h and h not in hab_opcoes_e)
+                            if has_outro and "Outro" not in default_sel:
+                                default_sel.append("Outro")
+                                
+                            h_sel_e = st.multiselect("Habilidade(s)?", hab_opcoes_e, default=default_sel, key=f"hsel_{reg['id']}")
+                            if "Outro" in h_sel_e:
+                                outro_val = ", ".join([h for h in h_atual_list if h and h not in hab_opcoes_e])
+                                e_hab_outro = st.text_input("Especifique o Outro:", value=outro_val, key=f"htxt_{reg['id']}")
+                                e_hab = ", ".join([h for h in h_sel_e if h != "Outro"] + ([e_hab_outro] if e_hab_outro else []))
+                            else:
+                                e_hab = ", ".join(h_sel_e)
                         else:
-                            hab_opcoes_e = ["Geral", "Outro"]
-                        
-                        h_atual = reg['habilidade_trabalhada'] if reg['habilidade_trabalhada'] else ""
-                        idx_hab = hab_opcoes_e.index(h_atual) if h_atual in hab_opcoes_e else (len(hab_opcoes_e)-1 if h_atual else 0)
-                        
-                        h_sel_e = st.selectbox("Habilidade?", hab_opcoes_e, index=idx_hab, key=f"hsel_{reg['id']}")
-                        if h_sel_e == "Outro":
-                            e_hab = st.text_input("Especifique:", value=h_atual if h_atual not in hab_opcoes_e else "", key=f"htxt_{reg['id']}")
-                        else:
-                            e_hab = h_sel_e
+                            if area_prof == "Português":
+                                hab_opcoes_e = HABILIDADES_PORTUGUES
+                            else:
+                                hab_opcoes_e = ["Geral", "Outro"]
+                            
+                            idx_hab = hab_opcoes_e.index(h_atual) if h_atual in hab_opcoes_e else (len(hab_opcoes_e)-1 if h_atual else 0)
+                            
+                            h_sel_e = st.selectbox("Habilidade?", hab_opcoes_e, index=idx_hab, key=f"hsel_{reg['id']}")
+                            if h_sel_e == "Outro":
+                                e_hab = st.text_input("Especifique:", value=h_atual if h_atual not in hab_opcoes_e else "", key=f"htxt_{reg['id']}")
+                            else:
+                                e_hab = h_sel_e
                             
                         c_te, c_ee = st.columns(2)
                         with c_te:
