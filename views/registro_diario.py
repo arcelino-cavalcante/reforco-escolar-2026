@@ -99,6 +99,7 @@ def render():
                 observacao = None
                 tipo_atividade = None
                 estado_emocional = None
+                dificuldade_latente = None
                 
                 if compareceu == "Não":
                     motivo_falta = st.selectbox("Motivo da Ausência:", MOTIVOS_FALTA)
@@ -142,7 +143,6 @@ def render():
                     with c_n2:
                         participacao = st.selectbox("Engajamento/Comportamento:", NIVEIS_ENGAJAMENTO)
                         
-                    dificuldade_latente = None
                     if nivel_comp != "Autônomo (Domínio total)":
                         dificuldade_latente = st.text_input("⚠️ Dificuldade Latente Hoje:", placeholder="Ex: Errou a regra dos sinais de matemática na prática.", help="Crucial para guiar a escola sobre o que bloquear o aluno amanhã.")
 
@@ -257,6 +257,7 @@ def render():
                     e_obs = None
                     e_tipo = None
                     e_emoc = None
+                    e_dif = None
                     
                     if e_comp == "Não":
                         val_mot = reg.get('motivo_falta')
@@ -318,7 +319,6 @@ def render():
                             idx_part = NIVEIS_ENGAJAMENTO.index(val_part) if val_part in NIVEIS_ENGAJAMENTO else 1
                             e_part = st.selectbox("Atenção:", NIVEIS_ENGAJAMENTO, index=idx_part, key=f"part_{reg['id']}")
                             
-                        e_dif = None
                         if e_niv != "Autônomo (Domínio total)":
                             val_dif = reg.get('dificuldade_latente') or ""
                             e_dif = st.text_input("Gargalo hoje:", value=val_dif, key=f"dif_{reg['id']}")
