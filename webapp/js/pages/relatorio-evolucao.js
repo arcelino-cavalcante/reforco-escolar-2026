@@ -5,7 +5,7 @@
 
 import {
   listarTurmas, listarRegistrosPorRegente, listarConsolidadosPorRegente,
-  compreensaoParaNota, ESCALA_COMPREENSAO
+  compreensaoParaNota, nota4ParaNota10, nota10ParaTexto, ESCALA_COMPREENSAO, ESCALA_NOTA_10
 } from '../db.js';
 
 export async function renderRelatorioEvolucao(container, session) {
@@ -82,11 +82,15 @@ export async function renderRelatorioEvolucao(container, session) {
     const taxaPresenca = totalRegistros > 0 ? Math.round(totalPresentes / totalRegistros * 100) : 0;
     const alunosUnicos = [...new Set(dadosTurma.map(d => d.estudante_id))].length;
 
-    let mediaComp = 0;
+    let mediaComp4 = 0;
+    let mediaComp10 = 0;
+    let mediaCompLeitura = 'Não Avaliado';
     let taxaAutonomia = 0;
     const notasPresentes = presentes.map(d => compreensaoParaNota(d.nivel_compreensao || 0)).filter(n => n > 0);
     if (notasPresentes.length > 0) {
-      mediaComp = (notasPresentes.reduce((a, b) => a + b, 0) / notasPresentes.length).toFixed(1);
+      mediaComp4 = notasPresentes.reduce((a, b) => a + b, 0) / notasPresentes.length;
+      mediaComp10 = nota4ParaNota10(mediaComp4);
+      mediaCompLeitura = nota10ParaTexto(mediaComp10);
       taxaAutonomia = Math.round(notasPresentes.filter(n => n === 4).length / notasPresentes.length * 100);
     }
 
@@ -97,9 +101,10 @@ export async function renderRelatorioEvolucao(container, session) {
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
           ${metricCard('Alunos Atendidos', alunosUnicos, 'users', 'purple')}
           ${metricCard('Taxa de Presença', taxaPresenca + '%', 'check-circle', 'green')}
-          ${metricCard('Média Compreensão', mediaComp + '/4', 'brain', 'blue')}
+          ${metricCard('Média Compreensão', `${mediaComp10 ? mediaComp10.toFixed(1) : '0.0'}/10`, 'brain', 'blue')}
           ${metricCard('Autonomia Total', taxaAutonomia + '%', 'award', 'orange')}
         </div>
+        <p class="text-[10px] font-bold text-gray-500 mt-3">Leitura da média da turma: <span class="text-black">${mediaCompLeitura}</span>${mediaComp4 ? ` (equivalente a ${mediaComp4.toFixed(1)}/4)` : ''}</p>
       </div>
     `;
 
@@ -128,6 +133,7 @@ export async function renderRelatorioEvolucao(container, session) {
         // Simple bar chart
         for (const [dateStr, arr] of dateEntries) {
           const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
+          const avg10 = nota4ParaNota10(avg);
           const pct = Math.round((avg / 4) * 100);
           const dp = dateStr.split('-');
           const label = dp.length === 3 ? `${dp[2]}/${dp[1]}` : dateStr;
@@ -136,7 +142,7 @@ export async function renderRelatorioEvolucao(container, session) {
 
           html += `
             <div class="flex-1 flex flex-col items-center justify-end h-full min-w-0">
-              <p class="text-[8px] font-black mb-1">${avg.toFixed(1)}</p>
+              <p class="text-[8px] font-black mb-1">${avg10.toFixed(1)}</p>
               <div class="w-full ${colors[colorIdx]} border border-black transition-all" style="height:${pct}%"></div>
               <p class="text-[7px] font-bold mt-1 text-gray-400 truncate w-full text-center">${label}</p>
             </div>`;
@@ -145,7 +151,7 @@ export async function renderRelatorioEvolucao(container, session) {
         html += `
             </div>
             <div class="flex justify-between text-[8px] text-gray-400 uppercase font-bold mt-2 border-t border-gray-200 pt-1">
-              <span>1 = Não comp.</span><span>2 = Muita int.</span><span>3 = Pouca int.</span><span class="text-green-600">4 = Autônomo ✓</span>
+              <span>1-3/10 = Não compreendeu</span><span>4-5/10 = Muita intervenção</span><span>6-7/10 = Pouca intervenção</span><span class="text-green-600">8-10/10 = Autônomo ✓</span>
             </div>
           </div>
         `;
@@ -204,6 +210,7 @@ export async function renderRelatorioEvolucao(container, session) {
       const rankArr = Object.entries(alunoComp).map(([nome, notas]) => ({
         nome,
         media: notas.reduce((a, b) => a + b, 0) / notas.length,
+        media10: nota4ParaNota10(notas.reduce((a, b) => a + b, 0) / notas.length),
         qtd: notas.length
       })).sort((a, b) => b.media - a.media);
 
@@ -222,7 +229,7 @@ export async function renderRelatorioEvolucao(container, session) {
                   <span class="text-[10px] font-black uppercase tracking-wider text-gray-600 w-28 md:w-40 truncate flex-shrink-0">${a.nome}</span>
                   <div class="flex-1 h-5 bg-gray-200 border border-black overflow-hidden">
                     <div class="${colors[colorIdx]} h-full flex items-center justify-center" style="width:${pct}%">
-                      <span class="text-white text-[8px] font-black">${a.media.toFixed(1)}</span>
+                      <span class="text-white text-[8px] font-black">${a.media10.toFixed(1)}</span>
                     </div>
                   </div>
                   <span class="text-[9px] text-gray-400 font-bold w-14 text-right">(${a.qtd} aulas)</span>
@@ -232,6 +239,8 @@ export async function renderRelatorioEvolucao(container, session) {
         </div>
       `;
     }
+
+    html += renderGuiaEscalaNota10();
 
     html += `</div>`;
     container.innerHTML = html;
@@ -255,6 +264,22 @@ export async function renderRelatorioEvolucao(container, session) {
       <h2 class="text-2xl md:text-3xl font-black uppercase tracking-tight">📈 Relatório de Evolução</h2>
       <p class="text-gray-500 font-bold text-sm mt-1">Carregando...</p>
     </div><div class="h-40 skeleton rounded"></div></div>`;
+  }
+
+  function renderGuiaEscalaNota10() {
+    return `
+      <div class="bg-white border-2 border-black p-5 mb-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+        <h3 class="text-sm font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4">🧭 Escala Pedagógica 1-10</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+          ${ESCALA_NOTA_10.map((item) => `
+            <div class="border border-black bg-gray-50 p-2">
+              <p class="text-[10px] font-black">Nível ${item.nota} - ${item.titulo}</p>
+              <p class="text-[10px] text-gray-700 font-bold mt-0.5">${item.descricao}</p>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
   }
 }
 

@@ -8,7 +8,10 @@ import {
   listarEstudantes,
   listarProfsReforco,
   listarRegistrosDiariosTodos,
-  compreensaoParaNota
+  compreensaoParaNota,
+  nota4ParaNota10,
+  nota10ParaTexto,
+  ESCALA_NOTA_10
 } from '../db.js';
 
 const ESCALA_NOMES = [
@@ -97,6 +100,12 @@ export async function renderAnaliseEvolucao(container, session) {
     const isPresent = (r) => r.compareceu === 1 || r.compareceu === true || r.presente === 1 || r.presente === true;
     const presentes = registros.filter((r) => isPresent(r));
     const pctFreq = registros.length > 0 ? Math.round((presentes.length / registros.length) * 100) : 0;
+    const notasPresentes4 = presentes.map((r) => compreensaoParaNota(r.nivel_compreensao || 0)).filter((n) => n > 0);
+    const mediaComp4 = notasPresentes4.length > 0
+      ? (notasPresentes4.reduce((a, b) => a + b, 0) / notasPresentes4.length)
+      : 0;
+    const mediaComp10 = mediaComp4 > 0 ? nota4ParaNota10(mediaComp4) : 0;
+    const mediaCompLeitura = mediaComp10 > 0 ? nota10ParaTexto(mediaComp10) : 'Não Avaliado';
 
     // Distribuição de compreensão
     const dist = {};
@@ -125,7 +134,7 @@ export async function renderAnaliseEvolucao(container, session) {
 
     return `
       <!-- MÉTRICAS GLOBAIS -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-3">
         <div class="bg-white border-2 border-black p-3 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] text-center">
           <p class="text-[9px] font-bold uppercase text-gray-400">Total Registros</p>
           <p class="text-2xl font-black">${registros.length}</p>
@@ -142,7 +151,12 @@ export async function renderAnaliseEvolucao(container, session) {
           <p class="text-[9px] font-bold uppercase text-purple-600">Alunos Atendidos</p>
           <p class="text-2xl font-black text-purple-700">${Object.keys(alunoStats).length}</p>
         </div>
+        <div class="bg-cyan-50 border-2 border-black p-3 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] text-center">
+          <p class="text-[9px] font-bold uppercase text-cyan-700">Média Compreensão</p>
+          <p class="text-2xl font-black text-cyan-800">${mediaComp10 ? mediaComp10.toFixed(1) : '0.0'}/10</p>
+        </div>
       </div>
+      <p class="text-[10px] font-bold text-gray-500 mb-6">Leitura da média geral: <span class="text-black">${mediaCompLeitura}</span>${mediaComp4 ? ` (equivalente a ${mediaComp4.toFixed(1)}/4)` : ''}</p>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <!-- DISTRIBUIÇÃO DE COMPREENSÃO -->
@@ -174,6 +188,7 @@ export async function renderAnaliseEvolucao(container, session) {
           </h3>
           <div class="space-y-1.5 max-h-72 overflow-y-auto">
             ${ranking.slice(0, 20).map((r, i) => {
+              const media10 = nota4ParaNota10(r.media);
               const barW = Math.round((r.media / 4) * 100);
               const color = r.media >= 3 ? 'green' : r.media >= 2 ? 'blue' : 'red';
               return `<div class="flex items-center gap-2 p-1.5 border border-black bg-gray-50">
@@ -182,12 +197,15 @@ export async function renderAnaliseEvolucao(container, session) {
                   <p class="text-[10px] font-bold truncate">${r.nome}</p>
                   <div class="w-full bg-gray-200 h-1.5 mt-0.5"><div class="bg-${color}-500 h-full" style="width:${barW}%"></div></div>
                 </div>
-                <span class="text-[10px] font-black text-${color}-700">${r.media.toFixed(1)}</span>
+                <span class="text-[10px] font-black text-${color}-700">${media10.toFixed(1)}</span>
               </div>`;
             }).join('')}
           </div>
         </div>
-      </div>`;
+      </div>
+
+      ${renderGuiaEscalaNota10()}
+    `;
   }
 
   function renderGuide() {
@@ -195,5 +213,23 @@ export async function renderAnaliseEvolucao(container, session) {
       <i data-lucide="bar-chart-2" class="w-12 h-12 mx-auto mb-3 opacity-40"></i>
       <p class="text-xs font-bold uppercase tracking-wider">Clique "Analisar" para carregar os dados de evolução</p>
     </div>`;
+  }
+
+  function renderGuiaEscalaNota10() {
+    return `
+      <div class="bg-white border-2 border-black p-5 mt-6 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+        <h3 class="text-xs font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4 flex items-center gap-2">
+          <i data-lucide="book-open" class="w-4 h-4 text-cyan-700"></i> Escala Pedagógica 1-10
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+          ${ESCALA_NOTA_10.map((item) => `
+            <div class="border border-black bg-gray-50 p-2">
+              <p class="text-[10px] font-black">Nível ${item.nota} - ${item.titulo}</p>
+              <p class="text-[10px] text-gray-700 font-bold mt-0.5">${item.descricao}</p>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
   }
 }

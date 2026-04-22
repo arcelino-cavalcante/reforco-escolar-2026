@@ -2,7 +2,11 @@
  * 📊 REGISTRO MENSAL / BIMESTRAL — Prof. Reforço
  */
 
-import { listarEstudantes, obterRegentePorTurmaEArea, obterMediaDiariaEstudanteBimestre, obterConsolidadoTrimestre, criarConsolidadoMensal, atualizarConsolidadoMensal, ESCALA_COMPREENSAO } from '../db.js';
+import {
+  listarEstudantes, obterRegentePorTurmaEArea, obterMediaDiariaEstudanteBimestre,
+  obterConsolidadoTrimestre, criarConsolidadoMensal, atualizarConsolidadoMensal,
+  ESCALA_COMPREENSAO, ESCALA_NOTA_10
+} from '../db.js';
 
 export async function renderRegistroMensal(container, session) {
   if (session.perfil !== 'reforco') {
@@ -94,6 +98,8 @@ export async function renderRegistroMensal(container, session) {
         html += `<div class="bg-green-50 border-2 border-black p-3 mb-6"><p class="text-green-800 font-bold text-xs">✅ O Consolidado do Bimestre ${bimestreSelecionado} já foi fechado! Você pode alterar as notas abaixo.</p></div>`;
       }
 
+      html += renderEscalaNota10();
+
       const formTitle = regExistente ? `Edição de Boletim - Bimestre ${bimestreSelecionado}` : `Novo Boletim - Bimestre ${bimestreSelecionado}`;
       const btnLabel = regExistente ? `💾 Salvar Alterações` : `🚀 Publicar Relatório`;
 
@@ -180,6 +186,22 @@ export async function renderRegistroMensal(container, session) {
       <label class="block text-[9px] font-bold uppercase tracking-widest text-gray-500 mb-1 truncate">${label}</label>
       <input type="number" id="rm-${id}" min="1" max="10" value="${val}" class="w-full border-2 border-black p-2 font-black text-center text-lg bg-white outline-none focus:ring-2 focus:ring-black input-rm">
     </div>`;
+  }
+
+  function renderEscalaNota10() {
+    return `
+      <div class="mb-5 border-2 border-black bg-white p-3">
+        <p class="text-[10px] font-black uppercase tracking-wider mb-2">🧭 Guia da Escala 1–10 (Leitura Pedagógica)</p>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+          ${ESCALA_NOTA_10.map((item) => `
+            <div class="border border-black bg-gray-50 p-2">
+              <p class="text-[10px] font-black">Nível ${item.nota} - ${item.titulo}</p>
+              <p class="text-[10px] text-gray-700 font-bold mt-0.5">${item.descricao}</p>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
   }
 
   function attachEvents() {

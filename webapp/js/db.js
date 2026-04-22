@@ -1084,6 +1084,21 @@ export const ESCALA_COMPREENSAO = [
   "Autônomo (Domínio total)"
 ];
 
+export const ESCALA_NOTA_10 = [
+  { nota: 1, titulo: "Início Crítico", descricao: "Ainda não consegue realizar a habilidade, mesmo com ajuda intensa." },
+  { nota: 2, titulo: "Muito Inicial", descricao: "Reconhece partes da tarefa, mas depende totalmente da mediação." },
+  { nota: 3, titulo: "Inicial", descricao: "Apresenta primeiros acertos com apoio constante do professor." },
+  { nota: 4, titulo: "Parcial", descricao: "Compreende parte da habilidade, mas erra sem intervenção frequente." },
+  { nota: 5, titulo: "Em Desenvolvimento", descricao: "Executa com apoio contínuo e ainda oscila em autonomia." },
+  { nota: 6, titulo: "Intermediário", descricao: "Compreende o essencial com apoio pontual em etapas-chave." },
+  { nota: 7, titulo: "Quase Autônomo", descricao: "Resolve a maior parte da habilidade com poucas intervenções." },
+  { nota: 8, titulo: "Autônomo Inicial", descricao: "Realiza sozinho na maioria das situações e com boa consistência." },
+  { nota: 9, titulo: "Autônomo Consistente", descricao: "Mantém desempenho autônomo e transfere a habilidade com segurança." },
+  { nota: 10, titulo: "Domínio Amplo", descricao: "Domínio pleno da habilidade, com precisão e aplicação em novos contextos." }
+];
+
+const ESCALA_NOTA_10_MAP = new Map(ESCALA_NOTA_10.map((item) => [item.nota, item]));
+
 const ESCALA_PONTUACAO = {
   "Não compreendeu a habilidade": 1,
   "Compreendeu com muita intervenção": 2,
@@ -1111,6 +1126,39 @@ export function compreensaoParaNota(valor) {
     return 4;
   }
   return 0;
+}
+
+export function nota4ParaNota10(valor) {
+  const nota4 = Number(valor);
+  if (!Number.isFinite(nota4) || nota4 <= 0) return 0;
+  return Number((nota4 * 2.5).toFixed(1));
+}
+
+export function nota10ParaNota4(valor) {
+  const nota10 = Number(valor);
+  if (!Number.isFinite(nota10) || nota10 <= 0) return 0;
+  if (nota10 <= 3) return 1;
+  if (nota10 <= 5) return 2;
+  if (nota10 <= 7) return 3;
+  return 4;
+}
+
+export function compreensaoParaNota10(valor) {
+  const nota4 = compreensaoParaNota(valor);
+  return nota4 > 0 ? nota4ParaNota10(nota4) : 0;
+}
+
+export function nota10Info(valor) {
+  const raw = Number(valor);
+  if (!Number.isFinite(raw) || raw <= 0) return null;
+  const nota = Math.max(1, Math.min(10, Math.round(raw)));
+  return ESCALA_NOTA_10_MAP.get(nota) || null;
+}
+
+export function nota10ParaTexto(valor) {
+  const info = nota10Info(valor);
+  if (!info) return 'Não Avaliado';
+  return `${info.titulo}: ${info.descricao}`;
 }
 
 export function compreensaoLabel(valor) {
