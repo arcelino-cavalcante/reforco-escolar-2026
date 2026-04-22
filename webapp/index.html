@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#000000">
+    <meta name="description" content="Sistema de Reforço Escolar - Portal Pedagógico">
+    <title>Reforço Escolar</title>
+
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Tailwind Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'translateY(12px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(100%)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        scaleIn: {
+                            '0%': { opacity: '0', transform: 'scale(0.95)' },
+                            '100%': { opacity: '1', transform: 'scale(1)' },
+                        },
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.4s ease-out',
+                        'slide-up': 'slideUp 0.35s ease-out',
+                        'scale-in': 'scaleIn 0.3s ease-out',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* === NATIVE APP FEEL === */
+        * { -webkit-tap-highlight-color: transparent; }
+        html, body {
+            overscroll-behavior: none;
+            -webkit-overflow-scrolling: touch;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+
+        /* === BRUTALIST BUTTON EFFECT === */
+        .btn-brutal { transition: all 0.1s ease-in-out; }
+        .btn-brutal:active {
+            box-shadow: none !important;
+            transform: translate(4px, 4px);
+        }
+
+        /* === SAFE AREA (iPhone notch) === */
+        .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+        /* === SCROLLBAR === */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 3px; }
+
+        /* === SKELETON LOADING === */
+        .skeleton {
+            background: linear-gradient(90deg, #e4e4e7 25%, #f4f4f5 50%, #e4e4e7 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        /* === NAV ACTIVE STATES === */
+        .nav-active {
+            background-color: #dbeafe !important;
+            border-color: black !important;
+            color: black !important;
+            box-shadow: 4px 4px 0px 0px rgba(0,0,0,1) !important;
+        }
+
+        .tab-active { position: relative; }
+        .tab-active::before {
+            content: '';
+            position: absolute;
+            top: -4px;
+            left: 20%;
+            right: 20%;
+            height: 4px;
+            background: black;
+        }
+
+        /* === PAGE TRANSITIONS === */
+        .page-enter { animation: fadeIn 0.35s ease-out; }
+
+        /* === SELECT STYLING === */
+        select {
+            -webkit-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 40px;
+        }
+
+        /* === TOAST === */
+        .toast-enter {
+            animation: slideUp 0.3s ease-out, fadeIn 0.3s ease-out;
+        }
+    </style>
+</head>
+<body class="bg-[#f4f4f5] text-black font-sans h-[100dvh] overflow-hidden">
+    <div id="app" class="h-full"></div>
+    <script type="module" src="/js/main.js"></script>
+</body>
+</html>
