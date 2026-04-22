@@ -70,6 +70,17 @@ const ANALISES_GUIA = [
     uso: 'Usar o fechamento para reunião pedagógica e plano de ação da turma seguinte.'
   },
   {
+    titulo: 'Consolidado Quantitativo Automático',
+    campos: 'notas por habilidade (port/mat + avançado anos finais), estudante, bimestre, data_registro',
+    calculos: [
+      'Atingiram metas: média >= 7.0.',
+      'Em processo: média entre 4.0 e 6.9.',
+      'Defasagem: média < 4.0.',
+      'Exibe quantidade e percentual por categoria em Português e Matemática.'
+    ],
+    uso: 'Apoiar reunião pedagógica com visão objetiva de quem avançou, quem está em processo e quem precisa de intervenção imediata.'
+  },
+  {
     titulo: 'Fluxo de Encaminhamentos',
     campos: 'status, data_solicitacao, data_conclusao, alvo_area, regente_id',
     calculos: [
@@ -85,6 +96,7 @@ const ROTINA_ACAO = {
   reforco: [
     'Antes da aula: revise no painel quem faltou e quem está com baixa compreensão.',
     'Durante a aula: registre habilidade, tipo de atividade, estado emocional e participação.',
+    'No fechamento mensal: confira o consolidado quantitativo automático para validar seu parecer.',
     'Fim da aula: em casos críticos, encaminhe o regente no mesmo dia.',
     'Semanal: repita intervenções que tiveram ganho positivo no painel de efetividade.'
   ],
@@ -192,9 +204,30 @@ export async function renderGuiaUso(container, session) {
             </div>
             <div class="border-2 border-black bg-gray-50 p-3">
               <p class="text-[11px] font-black uppercase tracking-wider">Fechamento Bimestral</p>
-              <p class="text-[11px] font-bold text-gray-700 mt-1">parecer_evolutivo, recomendacao_alta, acao_pedagogica e notas de habilidade por área.</p>
+              <p class="text-[11px] font-bold text-gray-700 mt-1">parecer_evolutivo, recomendacao_alta, acao_pedagogica, nível inicial (leitura/escrita), status final, observações pedagógicas, ciente do regente, frequência do bimestre e notas de habilidade por área.</p>
             </div>
           </div>
+        </div>
+
+        <div class="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+          <h3 class="text-xs font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4">Como Funciona o Consolidado Quantitativo Automático</h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="border-2 border-black bg-green-50 p-3">
+              <p class="text-[11px] font-black uppercase tracking-wider text-green-800">Atingiram as metas</p>
+              <p class="text-[11px] font-bold text-green-900 mt-1">Média final por disciplina maior ou igual a <b>7.0</b>.</p>
+            </div>
+            <div class="border-2 border-black bg-yellow-50 p-3">
+              <p class="text-[11px] font-black uppercase tracking-wider text-yellow-800">Em processo</p>
+              <p class="text-[11px] font-bold text-yellow-900 mt-1">Média final por disciplina entre <b>4.0 e 6.9</b>.</p>
+            </div>
+            <div class="border-2 border-black bg-red-50 p-3">
+              <p class="text-[11px] font-black uppercase tracking-wider text-red-800">Defasagem</p>
+              <p class="text-[11px] font-bold text-red-900 mt-1">Média final por disciplina menor que <b>4.0</b>.</p>
+            </div>
+          </div>
+          <p class="text-[11px] font-bold text-gray-700 mt-3">
+            O sistema calcula isso automaticamente por <b>Português</b> e <b>Matemática</b>, com quantidade e percentual por categoria, seguindo o quadro 3 das fichas físicas.
+          </p>
         </div>
 
         <div class="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
@@ -325,6 +358,7 @@ async function gerarDiagnostico(session) {
 function montarChecklist(ctx) {
   const diarioCompleto = ctx.diario.coberturaCritica >= 70;
   const mensalCompleto = ctx.mensal.coberturaCritica >= 70;
+  const quantAutomaticoOk = ctx.mensal.pAutoQuant >= 70;
 
   return [
     {
@@ -391,6 +425,12 @@ function montarChecklist(ctx) {
       label: 'Qualidade dos campos bimestrais',
       detalhe: `Cobertura crítica: ${ctx.mensal.coberturaCritica}%`,
       ok: mensalCompleto,
+      obrigatorio: false
+    },
+    {
+      label: 'Consolidado quantitativo automático',
+      detalhe: `Base com notas válidas para classificação: ${ctx.mensal.pAutoQuant}%`,
+      ok: quantAutomaticoOk,
       obrigatorio: false
     }
   ];
@@ -469,15 +509,27 @@ function analisarDadosDiarios(registros) {
 
 function analisarDadosMensais(consolidados, encaminhamentos) {
   const notas = countFilled(consolidados, hasAnyNotaBimestral);
+  const autoQuant = countFilled(consolidados, hasAnyNotaBimestral);
   const parecer = countFilled(consolidados, (r) => r.parecer_evolutivo);
   const acao = countFilled(consolidados, (r) => r.acao_pedagogica);
+  const statusFinal = countFilled(consolidados, (r) => r.status_final_consolidado);
+  const obsPedagogica = countFilled(consolidados, (r) => r.observacoes_pedagogicas);
+  const nivelInicial = countFilled(consolidados, (r) => r.nivel_inicial_escrita || r.nivel_inicial_leitura);
+  const regenteCiente = countFilled(consolidados, (r) => r.regente_ciente_frequencia === true || r.regente_ciente_frequencia === 1);
+  const freqSnapshot = countFilled(consolidados, hasFreqSnapshot);
   const alta = countFilled(consolidados, (r) => typeof r.recomendacao_alta === 'boolean' || r.recomendacao_alta === 0 || r.recomendacao_alta === 1);
 
   const pNotas = pct(notas, consolidados.length);
+  const pAutoQuant = pct(autoQuant, consolidados.length);
   const pParecer = pct(parecer, consolidados.length);
   const pAcao = pct(acao, consolidados.length);
+  const pStatusFinal = pct(statusFinal, consolidados.length);
+  const pObsPedagogica = pct(obsPedagogica, consolidados.length);
+  const pNivelInicial = pct(nivelInicial, consolidados.length);
+  const pRegenteCiente = pct(regenteCiente, consolidados.length);
+  const pFreqSnapshot = pct(freqSnapshot, consolidados.length);
   const pAlta = pct(alta, consolidados.length);
-  const coberturaCritica = Math.round(media([pNotas, pParecer, pAcao]));
+  const coberturaCritica = Math.round(media([pNotas, pParecer, pAcao, pStatusFinal, pRegenteCiente, pAutoQuant]));
 
   const statusCount = { pendente: 0, atendido: 0, lido: 0 };
   const temposResposta = [];
@@ -499,8 +551,14 @@ function analisarDadosMensais(consolidados, encaminhamentos) {
   return {
     totalConsolidados: consolidados.length,
     pNotas,
+    pAutoQuant,
     pParecer,
     pAcao,
+    pStatusFinal,
+    pObsPedagogica,
+    pNivelInicial,
+    pRegenteCiente,
+    pFreqSnapshot,
     pAlta,
     coberturaCritica,
     totalEncaminhamentos: encaminhamentos.length,
@@ -789,6 +847,7 @@ function buildHtmlRelatorioPdf(diagnostico, resumoExec, perfilAtual, dataGeracao
           <li>Checklist OK: ${resumoExec.okItens}/${resumoExec.totalItens}</li>
           <li>Cobertura crítica do diário: ${d.coberturaCritica ?? 0}%</li>
           <li>Cobertura crítica bimestral: ${m.coberturaCritica ?? 0}%</li>
+          <li>Base do consolidado quantitativo automático: ${m.pAutoQuant ?? 0}%</li>
           <li>Tempo médio de resposta (fluxo): ${m.tempoMedio === null || m.tempoMedio === undefined ? 'N/D' : `${m.tempoMedio} dias`}</li>
         </ul>
       </div>
@@ -848,8 +907,14 @@ function buildHtmlRelatorioPdf(diagnostico, resumoExec, perfilAtual, dataGeracao
       </thead>
       <tbody>
         <tr><td>Consolidados com notas de habilidade</td><td>${m.pNotas ?? 0}%</td></tr>
+        <tr><td>Base para consolidado quantitativo automático</td><td>${m.pAutoQuant ?? 0}%</td></tr>
         <tr><td>Consolidados com parecer_evolutivo</td><td>${m.pParecer ?? 0}%</td></tr>
         <tr><td>Consolidados com acao_pedagogica</td><td>${m.pAcao ?? 0}%</td></tr>
+        <tr><td>Consolidados com status_final_consolidado</td><td>${m.pStatusFinal ?? 0}%</td></tr>
+        <tr><td>Consolidados com observacoes_pedagogicas</td><td>${m.pObsPedagogica ?? 0}%</td></tr>
+        <tr><td>Consolidados com nível inicial (leitura/escrita)</td><td>${m.pNivelInicial ?? 0}%</td></tr>
+        <tr><td>Consolidados com ciente do regente</td><td>${m.pRegenteCiente ?? 0}%</td></tr>
+        <tr><td>Consolidados com snapshot da frequência</td><td>${m.pFreqSnapshot ?? 0}%</td></tr>
         <tr><td>Consolidados com recomendacao_alta</td><td>${m.pAlta ?? 0}%</td></tr>
         <tr><td><strong>Cobertura crítica bimestral</strong></td><td><strong>${m.coberturaCritica ?? 0}%</strong></td></tr>
         <tr><td>Encaminhamentos pendentes</td><td>${m.pendente ?? 0}</td></tr>
@@ -925,8 +990,14 @@ function renderQualidadeMensal(mensal) {
   return `
     <div class="space-y-2">
       ${linhaQualidade('Consolidados com notas de habilidade', mensal.pNotas)}
+      ${linhaQualidade('Base para consolidado quantitativo automático', mensal.pAutoQuant)}
       ${linhaQualidade('Consolidados com parecer_evolutivo', mensal.pParecer)}
       ${linhaQualidade('Consolidados com acao_pedagogica', mensal.pAcao)}
+      ${linhaQualidade('Consolidados com status_final_consolidado', mensal.pStatusFinal)}
+      ${linhaQualidade('Consolidados com observacoes_pedagogicas', mensal.pObsPedagogica)}
+      ${linhaQualidade('Consolidados com nivel inicial (leitura/escrita)', mensal.pNivelInicial)}
+      ${linhaQualidade('Consolidados com ciente do regente', mensal.pRegenteCiente)}
+      ${linhaQualidade('Consolidados com snapshot da frequência', mensal.pFreqSnapshot)}
       ${linhaQualidade('Consolidados com recomendacao_alta', mensal.pAlta)}
       <div class="pt-2 border-t border-black">
         <p class="text-[11px] font-black">Cobertura crítica: <span class="${statusColor(mensal.coberturaCritica)}">${mensal.coberturaCritica}%</span></p>
@@ -1009,12 +1080,26 @@ function hasAnyNotaBimestral(row) {
     'port_escrita',
     'port_leitura',
     'port_interpretacao',
-    'port_pontuacao'
+    'port_pontuacao',
+    'af_localizar_info',
+    'af_inferir_sentido',
+    'af_identificar_tema',
+    'af_pontuacao_sentido'
   ];
   return keys.some((k) => {
     const v = Number(row?.[k]);
     return Number.isFinite(v) && v > 0;
   });
+}
+
+function hasFreqSnapshot(row) {
+  const keys = [
+    'freq_total_bimestre',
+    'freq_presencas_bimestre',
+    'freq_faltas_bimestre',
+    'freq_percentual_bimestre'
+  ];
+  return keys.some((k) => row?.[k] !== undefined && row?.[k] !== null && String(row?.[k]).trim() !== '');
 }
 
 function normalizaStatus(status) {

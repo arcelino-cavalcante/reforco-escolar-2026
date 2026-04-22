@@ -111,6 +111,7 @@ function invalidateRegistrosCaches() {
   invalidateCache([
     'registros_',
     'presencas_est:',
+    'freq_bim:',
     'media_bim:',
     'stats_coord:'
   ]);
@@ -1203,6 +1204,35 @@ export async function obterMediaDiariaEstudanteBimestre(estudanteId, profId, bim
   const media = cnt > 0 ? Number((soma / cnt).toFixed(1)) : null;
   setCache(cacheKey, media);
   return media;
+}
+
+export async function obterResumoFrequenciaEstudanteBimestre(estudanteId, profId, bimestre) {
+  if (!isFirebaseConfigured()) {
+    return { total: 0, presencas: 0, faltas: 0, pctPresenca: 0 };
+  }
+
+  const cacheKey = `freq_bim:${String(estudanteId)}:${String(profId)}:${String(bimestre)}`;
+  const cached = getCache(cacheKey);
+  if (cached) return cached;
+
+  const db = getDb();
+  const snap = await getDocs(
+    query(collection(db, 'registros_diarios'),
+      where('estudante_id', '==', String(estudanteId)),
+      where('prof_id', '==', String(profId)),
+      where('bimestre', '==', String(bimestre))
+    )
+  );
+
+  const docs = await filtrarDocsPorEscola(docsToList(snap), 'registros_diarios');
+  const total = docs.length;
+  const presencas = docs.filter((d) => d.compareceu === 1 || d.compareceu === true).length;
+  const faltas = Math.max(0, total - presencas);
+  const pctPresenca = total > 0 ? Math.round((presencas / total) * 100) : 0;
+
+  const resumo = { total, presencas, faltas, pctPresenca };
+  setCache(cacheKey, resumo);
+  return resumo;
 }
 
 export async function obterConsolidadoTrimestre(estudanteId, profId, bimestre) {
