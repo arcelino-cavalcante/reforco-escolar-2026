@@ -44,6 +44,7 @@ const renderAnaliseEvolucaoHub = lazyNamedRender(() => import('./pages/analise-e
 const renderIATutor = lazyNamedRender(() => import('./pages/ia-tutor.js'), 'renderIATutor');
 const renderFechamentoBimestral = lazyNamedRender(() => import('./pages/fechamento-bimestral.js'), 'renderFechamentoBimestral');
 const renderFluxoEncaminhamentos = lazyNamedRender(() => import('./pages/fluxo-encaminhamentos.js'), 'renderFluxoEncaminhamentos');
+const renderGuiaUso = lazyNamedRender(() => import('./pages/guia-uso.js'), 'renderGuiaUso');
 const renderAdmin = lazyNamedRender(() => import('./pages/admin.js'), 'renderAdmin');
 
 const PAGE_PRELOADERS = {
@@ -51,11 +52,13 @@ const PAGE_PRELOADERS = {
     { id: 'dashboard', load: () => import('./pages/dashboard.js') },
     { id: 'registro-diario', load: () => import('./pages/registro-diario.js') },
     { id: 'registro-mensal', load: () => import('./pages/registro-mensal.js') },
-    { id: 'historico', load: () => import('./pages/historico.js') }
+    { id: 'historico', load: () => import('./pages/historico.js') },
+    { id: 'guia-uso', load: () => import('./pages/guia-uso.js') }
   ],
   regente: [
     { id: 'painel-regente', load: () => import('./pages/painel-regente.js') },
-    { id: 'relatorio-evolucao', load: () => import('./pages/relatorio-evolucao.js') }
+    { id: 'relatorio-evolucao', load: () => import('./pages/relatorio-evolucao.js') },
+    { id: 'guia-uso', load: () => import('./pages/guia-uso.js') }
   ],
   coordenacao: [
     { id: 'dashboard', load: () => import('./pages/dashboard.js') },
@@ -64,6 +67,7 @@ const PAGE_PRELOADERS = {
     { id: 'fluxo-encaminhamentos', load: () => import('./pages/fluxo-encaminhamentos.js') },
     { id: 'dossie', load: () => import('./pages/dossie.js') },
     { id: 'ver-registros', load: () => import('./pages/ver-registros.js') },
+    { id: 'guia-uso', load: () => import('./pages/guia-uso.js') },
     { id: 'ia-tutor', load: () => import('./pages/ia-tutor.js') },
     { id: 'cadastros', load: () => import('./pages/cadastros.js') }
   ],
@@ -97,14 +101,17 @@ const MENUS = {
     { id: 'registro-diario', label: 'Ficha Diária', short: 'Diário', icon: 'pencil-line', render: renderRegistroDiario },
     { id: 'registro-mensal', label: 'Registro Mensal', short: 'Bimestral', icon: 'calendar-check', render: renderRegistroMensal },
     { id: 'historico', label: 'Histórico', short: 'Histórico', icon: 'clock', render: renderHistorico },
+    { id: 'guia-uso', label: 'Guia de Uso', short: 'Guia', icon: 'book-open', render: renderGuiaUso },
   ],
   regente: [
     { id: 'painel-regente', label: 'Painel da Turma', short: 'Painel', icon: 'users', render: renderPainelRegente },
     { id: 'relatorio-evolucao', label: 'Relatório de Evolução', short: 'Evolução', icon: 'trending-up', render: renderRelatorioEvolucao },
+    { id: 'guia-uso', label: 'Guia de Uso', short: 'Guia', icon: 'book-open', render: renderGuiaUso },
   ],
   coordenacao: [
     { id: 'dashboard', label: 'Dashboard', short: 'Início', icon: 'layout-dashboard', render: renderDashboard },
     { id: 'analise-evolucao', label: 'Análises', short: 'Análises', icon: 'bar-chart-2', render: renderAnaliseEvolucaoHub },
+    { id: 'guia-uso', label: 'Guia e Tutorial', short: 'Guia', icon: 'book-open', render: renderGuiaUso },
     { id: 'fechamento-bimestral', label: 'Fechamento Bimestral', short: 'Fechamento', icon: 'clipboard-check', render: renderFechamentoBimestral },
     { id: 'fluxo-encaminhamentos', label: 'Fluxo de Encaminhamentos', short: 'Encaminh.', icon: 'git-pull-request-arrow', render: renderFluxoEncaminhamentos },
     { id: 'dossie', label: 'Dossiê do Estudante', short: 'Dossiê', icon: 'user-search', render: renderDossie },
