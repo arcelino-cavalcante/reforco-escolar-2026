@@ -29,6 +29,7 @@ export async function renderVerRegistros(container, session) {
   let profs = [];
   const profMap = {};
   const estMap = {};
+  let ultimoRelatorio = null;
 
   container.innerHTML = loadingHTML();
 
@@ -55,7 +56,7 @@ export async function renderVerRegistros(container, session) {
         </div>
 
         <div class="bg-white border-2 border-black p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] mb-6">
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
               <label class="block text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-1">Mês</label>
               <select id="filtro-mes" class="w-full border-2 border-black p-2 bg-gray-50 font-bold text-sm outline-none">
@@ -75,11 +76,14 @@ export async function renderVerRegistros(container, session) {
                 ${profs.map((p) => `<option value="${escAttr(p.id)}" ${String(p.id) === String(profSel) ? 'selected' : ''}>${esc(p.nome)}${p.area ? ` (${esc(p.area)})` : ''}</option>`).join('')}
               </select>
             </div>
-            <div class="md:self-end">
-              <button id="btn-buscar-relatorios" class="w-full bg-black border-2 border-black text-white px-4 py-2 font-black uppercase tracking-wider text-xs btn-brutal shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center gap-2">
-                <i data-lucide="search" class="w-4 h-4"></i> Gerar Relatórios
-              </button>
-            </div>
+          </div>
+          <div class="mt-4 flex flex-wrap items-center gap-2">
+            <button id="btn-buscar-relatorios" class="bg-black border-2 border-black text-white px-4 py-2 font-black uppercase tracking-wider text-xs btn-brutal shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center gap-2">
+              <i data-lucide="search" class="w-4 h-4"></i> Gerar Relatórios
+            </button>
+            <button id="btn-exportar-pdf" disabled class="bg-gray-200 border-2 border-black text-gray-600 px-4 py-2 font-black uppercase tracking-wider text-xs btn-brutal shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center gap-2 disabled:opacity-70">
+              <i data-lucide="file-down" class="w-4 h-4"></i> Exportar PDF
+            </button>
           </div>
         </div>
 
@@ -93,6 +97,7 @@ export async function renderVerRegistros(container, session) {
     `;
 
     if (window.lucide) lucide.createIcons();
+    atualizarBotaoExportar();
 
     container.querySelector('#btn-buscar-relatorios')?.addEventListener('click', async () => {
       mesSel = Number(container.querySelector('#filtro-mes')?.value || mesSel);
@@ -100,14 +105,39 @@ export async function renderVerRegistros(container, session) {
       profSel = String(container.querySelector('#filtro-prof')?.value || '');
       await fetchAndShow();
     });
+    container.querySelector('#btn-exportar-pdf')?.addEventListener('click', () => {
+      if (!ultimoRelatorio) {
+        alert('Gere os relatórios antes de exportar em PDF.');
+        return;
+      }
+      exportarRelatoriosPdf(ultimoRelatorio);
+    });
 
     await fetchAndShow();
+  }
+
+  function atualizarBotaoExportar() {
+    const btn = container.querySelector('#btn-exportar-pdf');
+    if (!btn) return;
+
+    if (ultimoRelatorio) {
+      btn.disabled = false;
+      btn.classList.remove('bg-gray-200', 'text-gray-600');
+      btn.classList.add('bg-emerald-600', 'text-white');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.classList.remove('bg-emerald-600', 'text-white');
+    btn.classList.add('bg-gray-200', 'text-gray-600');
   }
 
   async function fetchAndShow() {
     const resultDiv = container.querySelector('#regs-result');
     if (!resultDiv) return;
     resultDiv.innerHTML = '<div class="text-center py-8"><div class="h-6 skeleton rounded w-48 mx-auto"></div></div>';
+    ultimoRelatorio = null;
+    atualizarBotaoExportar();
 
     try {
       const [regsMes, consolidadosAll] = await Promise.all([
@@ -131,6 +161,19 @@ export async function renderVerRegistros(container, session) {
       }
 
       const analise = montarAnalise(registrosFiltrados, consolidadosFiltrados, profMap, estMap);
+      ultimoRelatorio = {
+        escolaNome: session?.escolaNome || '',
+        mes: mesSel,
+        ano: anoSel,
+        mesNome: NOMES_MES[mesSel - 1] || '',
+        profSel: profSel || '',
+        professorNome: obterNomeProfessorSelecionado(profSel, profMap, registrosFiltrados, consolidadosFiltrados),
+        registros: registrosFiltrados,
+        consolidados: consolidadosFiltrados,
+        profMap,
+        estMap
+      };
+      atualizarBotaoExportar();
 
       resultDiv.innerHTML = `
         <div class="space-y-6">
@@ -152,6 +195,8 @@ export async function renderVerRegistros(container, session) {
     } catch (err) {
       console.error('Erro ao gerar relatórios mensais:', err);
       resultDiv.innerHTML = `<p class="text-xs font-bold text-red-600 text-center py-8">Erro ao gerar relatórios: ${esc(err.message || 'Falha desconhecida')}</p>`;
+      ultimoRelatorio = null;
+      atualizarBotaoExportar();
     }
   }
 }
@@ -631,6 +676,491 @@ function renderLancamentosDiarios(regs) {
       </div>
     </section>
   `;
+}
+
+function exportarRelatoriosPdf(contexto) {
+  try {
+    const html = buildHtmlRelatoriosPdf(contexto);
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const popup = window.open(url, '_blank');
+
+    if (!popup) {
+      baixarRelatorioHtmlFallback(html, gerarNomeArquivoRelatorio(contexto));
+      alert('Pop-up bloqueado. Baixamos um arquivo HTML para você abrir e imprimir em PDF.');
+    }
+
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (err) {
+    console.error('Erro ao exportar relatório PDF:', err);
+    alert('Não foi possível gerar o PDF agora. Tente novamente.');
+  }
+}
+
+function buildHtmlRelatoriosPdf(contexto) {
+  const blocos = montarBlocosExportacao(contexto);
+  const filtroProfessor = contexto?.profSel
+    ? contexto?.professorNome || 'Professor selecionado'
+    : 'Todos os professores';
+  const dataGeracao = formatDateTimeBR(new Date());
+
+  return `
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Relatórios Mensais - ${esc(contexto?.mesNome || '')}/${esc(contexto?.ano || '')}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #111827;
+      background: #ffffff;
+    }
+    .top-actions {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 12px;
+      background: #ffffff;
+      padding-bottom: 8px;
+    }
+    .print-btn {
+      border: 1px solid #111827;
+      background: #111827;
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 12px;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+    .cabecalho {
+      border: 2px solid #111827;
+      padding: 14px;
+      margin-bottom: 16px;
+    }
+    .cabecalho h1 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.2;
+      text-transform: uppercase;
+    }
+    .cabecalho p {
+      margin: 6px 0 0 0;
+      font-size: 12px;
+      color: #374151;
+    }
+    .bloco-professor {
+      border: 2px solid #111827;
+      padding: 14px;
+      margin-bottom: 18px;
+    }
+    .quebra-pagina {
+      page-break-before: always;
+    }
+    h2 {
+      margin: 0 0 8px 0;
+      font-size: 17px;
+      text-transform: uppercase;
+    }
+    h3 {
+      margin: 14px 0 8px 0;
+      font-size: 13px;
+      text-transform: uppercase;
+    }
+    .meta {
+      margin: 0;
+      font-size: 11px;
+      color: #374151;
+    }
+    .linha-resumo {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin: 10px 0 12px 0;
+    }
+    .resumo-card {
+      border: 1px solid #111827;
+      background: #f9fafb;
+      padding: 8px;
+    }
+    .resumo-card .label {
+      font-size: 10px;
+      text-transform: uppercase;
+      color: #6b7280;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .resumo-card .valor {
+      font-size: 17px;
+      font-weight: 800;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 6px;
+      font-size: 11px;
+    }
+    th, td {
+      border: 1px solid #111827;
+      padding: 6px;
+      text-align: left;
+      vertical-align: top;
+    }
+    thead th {
+      background: #111827;
+      color: #ffffff;
+      font-weight: 800;
+      text-transform: uppercase;
+      font-size: 10px;
+      letter-spacing: 0.02em;
+    }
+    .hint {
+      margin-top: 6px;
+      font-size: 10px;
+      color: #4b5563;
+    }
+    .vazio {
+      border: 1px dashed #6b7280;
+      padding: 10px;
+      font-size: 11px;
+      color: #4b5563;
+      margin-top: 6px;
+    }
+    .rodape {
+      margin-top: 16px;
+      font-size: 10px;
+      color: #6b7280;
+      border-top: 1px solid #d1d5db;
+      padding-top: 8px;
+    }
+    @media print {
+      body { padding: 12px; }
+      .top-actions { display: none; }
+      .bloco-professor { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="top-actions">
+    <button class="print-btn" onclick="window.print()">Imprimir / Salvar PDF</button>
+  </div>
+
+  <section class="cabecalho">
+    <h1>Relatórios Mensais do Reforço</h1>
+    <p><strong>Escola:</strong> ${esc(contexto?.escolaNome || 'Não informada')}</p>
+    <p><strong>Referência:</strong> ${esc(contexto?.mesNome || '')}/${esc(contexto?.ano || '')}</p>
+    <p><strong>Filtro de Professor:</strong> ${esc(filtroProfessor)}</p>
+    <p><strong>Gerado em:</strong> ${esc(dataGeracao)}</p>
+  </section>
+
+  ${blocos.map((b, idx) => renderBlocoProfessorPdf(b, idx)).join('')}
+
+  <p class="rodape">Documento gerado automaticamente pelo módulo Relatórios Mensais.</p>
+</body>
+</html>
+  `;
+}
+
+function renderBlocoProfessorPdf(bloco, idx) {
+  const a = bloco?.analise || montarAnalise([], [], {}, {});
+  const faltas = a.relatorioFaltas || { totalFaltas: 0, totalAlunosComFalta: 0, motivos: [], detalhes: [] };
+  const consolidado = a.relatorioConsolidado || { total: 0, comParecer: 0, comAcao: 0, comAlta: 0, comStatusFinal: 0, porProfessor: [], pendencias: [] };
+
+  return `
+    <section class="bloco-professor ${idx > 0 ? 'quebra-pagina' : ''}">
+      <h2>Professor: ${esc(bloco?.professorNome || 'Sem professor')}</h2>
+      <p class="meta">Referência: ${esc(bloco?.mesNome || '')}/${esc(bloco?.ano || '')}</p>
+
+      <div class="linha-resumo">
+        <div class="resumo-card">
+          <p class="label">Registros no Mês</p>
+          <p class="valor">${a.totalRegistros || 0}</p>
+        </div>
+        <div class="resumo-card">
+          <p class="label">Estudantes Atendidos</p>
+          <p class="valor">${a.totalAlunosAtendidos || 0}</p>
+        </div>
+        <div class="resumo-card">
+          <p class="label">Faltas Totais</p>
+          <p class="valor">${a.totalFaltas || 0}</p>
+        </div>
+        <div class="resumo-card">
+          <p class="label">Consolidados</p>
+          <p class="valor">${a.totalConsolidados || 0}</p>
+        </div>
+      </div>
+
+      <h3>1) Estudantes Atendidos no Mês</h3>
+      ${renderTabelaAtendidosPdf(a.relatorioAtendidos || [])}
+
+      <h3>2) Faltas Totais</h3>
+      ${renderTabelaMotivosPdf(faltas)}
+      ${renderTabelaDetalhesFaltasPdf((faltas.detalhes || []).slice(0, 40))}
+
+      <h3>3) Consolidado Mensal</h3>
+      ${renderTabelaConsolidadoProfessorPdf(consolidado.porProfessor || [])}
+      ${renderTabelaPendenciasPdf((consolidado.pendencias || []).slice(0, 30))}
+    </section>
+  `;
+}
+
+function renderTabelaAtendidosPdf(rows) {
+  if (!rows.length) return `<div class="vazio">Sem registros para atendimento no período.</div>`;
+  return `
+    <table>
+      <thead>
+        <tr>
+          <th>Professor</th>
+          <th>Atendidos</th>
+          <th>No Mês</th>
+          <th>Lançamentos</th>
+          <th>Faltas</th>
+          <th>Frequência</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map((r) => `
+          <tr>
+            <td>${esc(r.professor || 'Sem professor')}</td>
+            <td>${r.alunosAtendidos || 0}</td>
+            <td>${r.alunosNoMes || 0}</td>
+            <td>${r.registros || 0}</td>
+            <td>${r.faltas || 0}</td>
+            <td>${r.freqPct || 0}%</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderTabelaMotivosPdf(relatorioFaltas) {
+  const motivos = relatorioFaltas?.motivos || [];
+  const totalFaltas = Number(relatorioFaltas?.totalFaltas || 0);
+  const totalAlunos = Number(relatorioFaltas?.totalAlunosComFalta || 0);
+
+  if (!motivos.length) {
+    return `
+      <div class="vazio">Sem faltas registradas no período.</div>
+      <p class="hint">Total de faltas: ${totalFaltas} • Alunos com falta: ${totalAlunos}</p>
+    `;
+  }
+
+  return `
+    <table>
+      <thead>
+        <tr>
+          <th>Motivo</th>
+          <th>Quantidade</th>
+          <th>Percentual</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${motivos.map((m) => `
+          <tr>
+            <td>${esc(m.motivo || 'Sem motivo informado')}</td>
+            <td>${m.qtd || 0}</td>
+            <td>${m.pct || 0}%</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    <p class="hint">Total de faltas: ${totalFaltas} • Alunos com falta: ${totalAlunos}</p>
+  `;
+}
+
+function renderTabelaDetalhesFaltasPdf(rows) {
+  if (!rows.length) return `<div class="vazio">Sem detalhamento de faltas para exibir.</div>`;
+
+  return `
+    <table>
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Aluno</th>
+          <th>Turma</th>
+          <th>Motivo</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map((r) => `
+          <tr>
+            <td>${esc(formatDate(r.data))}</td>
+            <td>${esc(r.aluno || 'Sem nome')}</td>
+            <td>${esc(r.turma || 'Sem turma')}</td>
+            <td>${esc(r.motivo || 'Sem motivo informado')}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    <p class="hint">Mostrando até 40 linhas de faltas no PDF.</p>
+  `;
+}
+
+function renderTabelaConsolidadoProfessorPdf(rows) {
+  if (!rows.length) return `<div class="vazio">Sem consolidado mensal para o período selecionado.</div>`;
+
+  return `
+    <table>
+      <thead>
+        <tr>
+          <th>Professor</th>
+          <th>Total</th>
+          <th>Com Parecer</th>
+          <th>Com Ação</th>
+          <th>Com Status Final</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map((r) => `
+          <tr>
+            <td>${esc(r.professor || 'Sem professor')}</td>
+            <td>${r.total || 0}</td>
+            <td>${r.comParecer || 0} (${r.pctParecer || 0}%)</td>
+            <td>${r.comAcao || 0} (${r.pctAcao || 0}%)</td>
+            <td>${r.comStatusFinal || 0} (${r.pctStatusFinal || 0}%)</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function renderTabelaPendenciasPdf(rows) {
+  if (!rows.length) return `<div class="vazio">Sem pendências de preenchimento no consolidado.</div>`;
+
+  return `
+    <table>
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Aluno</th>
+          <th>Turma</th>
+          <th>Pendências</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map((r) => `
+          <tr>
+            <td>${esc(formatDate(r.data))}</td>
+            <td>${esc(r.aluno || 'Sem nome')}</td>
+            <td>${esc(r.turma || 'Sem turma')}</td>
+            <td>${esc(listarPendenciasTexto(r))}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    <p class="hint">Mostrando até 30 pendências no PDF.</p>
+  `;
+}
+
+function montarBlocosExportacao(contexto) {
+  const idsSet = new Set();
+
+  if (contexto?.profSel) {
+    idsSet.add(normalizarProfId(contexto.profSel));
+  } else {
+    (contexto?.registros || []).forEach((r) => idsSet.add(normalizarProfId(r?.prof_id)));
+    (contexto?.consolidados || []).forEach((c) => idsSet.add(normalizarProfId(c?.prof_id)));
+  }
+
+  if (!idsSet.size) idsSet.add('sem-prof');
+
+  return [...idsSet]
+    .map((profId) => {
+      const registrosProf = (contexto?.registros || []).filter((r) => normalizarProfId(r?.prof_id) === profId);
+      const consolidadosProf = (contexto?.consolidados || []).filter((c) => normalizarProfId(c?.prof_id) === profId);
+      const professorNome = resolverNomeProfessor(profId, contexto?.profMap || {}, registrosProf, consolidadosProf);
+      const analise = montarAnalise(registrosProf, consolidadosProf, contexto?.profMap || {}, contexto?.estMap || {});
+
+      return {
+        profId,
+        professorNome,
+        mesNome: contexto?.mesNome || '',
+        ano: contexto?.ano || '',
+        analise
+      };
+    })
+    .sort((a, b) => a.professorNome.localeCompare(b.professorNome));
+}
+
+function baixarRelatorioHtmlFallback(html, nomeBase = 'relatorios-mensais') {
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${slugify(nomeBase)}.html`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+
+function gerarNomeArquivoRelatorio(contexto) {
+  const mes = String(contexto?.mes || '').padStart(2, '0');
+  const ano = String(contexto?.ano || '');
+  const professor = contexto?.profSel
+    ? contexto?.professorNome || 'professor'
+    : 'todos-professores';
+  return `relatorios-reforco-${ano}-${mes}-${slugify(professor)}`;
+}
+
+function normalizarProfId(v) {
+  const out = String(v || '').trim();
+  return out || 'sem-prof';
+}
+
+function resolverNomeProfessor(profId, profMap, registros, consolidados) {
+  if (profId === 'sem-prof') return 'Sem professor vinculado';
+  const mapa = profMap[String(profId)] || {};
+  if (txt(mapa.nome)) return mapa.nome;
+
+  const reg = (registros || []).find((r) => txt(r?.prof_nome));
+  if (reg?.prof_nome) return reg.prof_nome;
+
+  const cons = (consolidados || []).find((c) => txt(c?.prof_nome));
+  if (cons?.prof_nome) return cons.prof_nome;
+
+  return 'Professor não identificado';
+}
+
+function obterNomeProfessorSelecionado(profSel, profMap, registros, consolidados) {
+  if (!profSel) return 'Todos os professores';
+  return resolverNomeProfessor(normalizarProfId(profSel), profMap, registros, consolidados);
+}
+
+function listarPendenciasTexto(row) {
+  const partes = [];
+  if (row?.parecer === 'Não informado') partes.push('Sem parecer');
+  if (row?.acao === 'Não informada') partes.push('Sem ação pedagógica');
+  if (row?.statusFinal === 'Não informado') partes.push('Sem status final');
+  return partes.length ? partes.join(' | ') : 'Sem pendências';
+}
+
+function formatDateTimeBR(dateObj) {
+  try {
+    return new Intl.DateTimeFormat('pt-BR', {
+      dateStyle: 'short',
+      timeStyle: 'short'
+    }).format(dateObj);
+  } catch (_e) {
+    return String(dateObj || '');
+  }
+}
+
+function slugify(v) {
+  return String(v || 'arquivo')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase() || 'arquivo';
 }
 
 function metricCard(label, valor, icon, color) {
