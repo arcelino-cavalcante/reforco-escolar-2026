@@ -592,20 +592,50 @@ function montarRotina(perfil) {
 }
 
 function exportarDiagnosticoPDF(diagnostico, session) {
-  const popup = window.open('', '_blank', 'noopener,noreferrer');
-  if (!popup) {
-    alert('Não foi possível abrir a janela de impressão. Verifique o bloqueador de pop-up.');
-    return;
+  try {
+    const resumoExec = montarResumoExecutivo(diagnostico);
+    const dataGeracao = formatDateTimeBR(new Date());
+    const perfilAtual = PERFIL_LABEL[session?.perfil] || String(session?.perfil || 'Usuário');
+    const html = buildHtmlRelatorioPdf(diagnostico, resumoExec, perfilAtual, dataGeracao);
+
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const blobUrl = URL.createObjectURL(blob);
+    const popup = window.open(blobUrl, '_blank');
+
+    if (!popup) {
+      URL.revokeObjectURL(blobUrl);
+      baixarRelatorioHtmlFallback(html, diagnostico?.escolaNome || 'escola');
+      alert('Pop-up bloqueado. Baixamos o relatório em HTML para você abrir e imprimir em PDF.');
+      return;
+    }
+
+    // Libera memória do blob depois que a nova aba já tiver carregado.
+    setTimeout(() => {
+      URL.revokeObjectURL(blobUrl);
+    }, 90_000);
+  } catch (err) {
+    console.error('Erro ao gerar relatório de PDF:', err);
+    alert('Erro ao gerar o PDF. Tente novamente.');
   }
+}
 
-  const resumoExec = montarResumoExecutivo(diagnostico);
-  const dataGeracao = formatDateTimeBR(new Date());
-  const perfilAtual = PERFIL_LABEL[session?.perfil] || String(session?.perfil || 'Usuário');
-  const html = buildHtmlRelatorioPdf(diagnostico, resumoExec, perfilAtual, dataGeracao);
-
-  popup.document.open();
-  popup.document.write(html);
-  popup.document.close();
+function baixarRelatorioHtmlFallback(html, escolaNome = 'escola') {
+  const nomeLimpo = String(escolaNome || 'escola')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9_-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .toLowerCase() || 'escola';
+  const fileName = `diagnostico_${nomeLimpo}.html`;
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
 function montarResumoExecutivo(diagnostico) {
@@ -943,14 +973,6 @@ function buildHtmlRelatorioPdf(diagnostico, resumoExec, perfilAtual, dataGeracao
     </div>
   </div>
 
-  <script>
-    window.addEventListener('load', () => {
-      setTimeout(() => {
-        window.focus();
-        window.print();
-      }, 300);
-    });
-  </script>
 </body>
 </html>`;
 }
