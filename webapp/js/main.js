@@ -115,7 +115,7 @@ const MENUS = {
     { id: 'fechamento-bimestral', label: 'Fechamento Bimestral', short: 'Fechamento', icon: 'clipboard-check', render: renderFechamentoBimestral },
     { id: 'fluxo-encaminhamentos', label: 'Fluxo de Encaminhamentos', short: 'Encaminh.', icon: 'git-pull-request-arrow', render: renderFluxoEncaminhamentos },
     { id: 'dossie', label: 'Dossiê do Estudante', short: 'Dossiê', icon: 'user-search', render: renderDossie },
-    { id: 'ver-registros', label: 'Ver Registros', short: 'Registros', icon: 'table', render: renderVerRegistros },
+    { id: 'ver-registros', label: 'Relatórios Mensais', short: 'Relatórios', icon: 'table', render: renderVerRegistros },
     { id: 'ia-tutor', label: 'IA Tutor', short: 'IA Tutor', icon: 'bot', render: renderIATutor },
     { id: 'cadastros', label: 'Cadastros', short: 'Cadastros', icon: 'settings', render: renderCadastros },
   ],
