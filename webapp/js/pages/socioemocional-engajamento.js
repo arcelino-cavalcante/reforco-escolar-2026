@@ -256,18 +256,20 @@ export async function renderSocioemocionalEngajamento(container, session) {
 
     const comEstado = presentes.filter((r) => String(r.estado_emocional || '').trim()).length;
     const comEngaj = presentes.filter((r) => String(r.participacao || '').trim()).length;
+    const completos = presentes.filter((r) => String(r.estado_emocional || '').trim() && String(r.participacao || '').trim()).length;
 
     return `
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         ${metricCard('Presenças no Período', presentes.length, 'user-check', 'green')}
-        ${metricCard('Com Estado Registrado', comEstado, 'heart', 'rose')}
-        ${metricCard('Com Engajamento', comEngaj, 'activity', 'blue')}
         ${metricCard('Sinais de Atenção', eventosAlerta.length, 'triangle-alert', 'amber')}
+        ${metricCard('Alunos com Sinal', alunosRisco.length, 'users-round', 'rose')}
+        ${metricCard('Registros Completos', completos, 'clipboard-check', 'blue')}
       </div>
+      <p class="text-[10px] font-bold text-gray-500 mb-6">Use esta tela para identificar rapidamente quais alunos precisam de conversa e acompanhamento imediato.</p>
 
       <div class="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] mb-6">
         <h3 class="text-xs font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4 flex items-center gap-2">
-          <i data-lucide="list-checks" class="w-4 h-4 text-amber-700"></i> Sinais de Atenção por Aluno (Lista Direta)
+          <i data-lucide="list-checks" class="w-4 h-4 text-amber-700"></i> Lista Direta de Sinais de Atenção
         </h3>
         ${renderListaSinaisDiretos(sinaisDiretos)}
       </div>
@@ -275,40 +277,24 @@ export async function renderSocioemocionalEngajamento(container, session) {
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div class="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
           <h3 class="text-xs font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4 flex items-center gap-2">
-            <i data-lucide="heart-pulse" class="w-4 h-4 text-rose-600"></i> Distribuição por Estado Emocional
-          </h3>
-          ${renderDistribuicao(estadoRows, presentes.length, 'bg-rose-500')}
-        </div>
-
-        <div class="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-          <h3 class="text-xs font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4 flex items-center gap-2">
-            <i data-lucide="gauge" class="w-4 h-4 text-blue-600"></i> Distribuição por Engajamento
-          </h3>
-          ${renderDistribuicao(engajRows, presentes.length, 'bg-blue-500')}
-        </div>
-      </div>
-
-      <div class="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] mb-6">
-        <h3 class="text-xs font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4 flex items-center gap-2">
-          <i data-lucide="table" class="w-4 h-4 text-purple-600"></i> Cruzamento Estado x Engajamento
-        </h3>
-        ${renderMatriz(matrizRows, matrizCols, matriz, presentes.length)}
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-          <h3 class="text-xs font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4 flex items-center gap-2">
-            <i data-lucide="users-round" class="w-4 h-4 text-amber-600"></i> Alunos com Maior Sinal de Atenção
+            <i data-lucide="users-round" class="w-4 h-4 text-amber-600"></i> Alunos com Mais Sinais
           </h3>
           ${renderTabelaAlunos(alunosRisco)}
         </div>
 
         <div class="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
           <h3 class="text-xs font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4 flex items-center gap-2">
-            <i data-lucide="clock-3" class="w-4 h-4 text-red-600"></i> Eventos Recentes de Atenção
+            <i data-lucide="heart-pulse" class="w-4 h-4 text-rose-600"></i> Estado Emocional (Resumo)
           </h3>
-          ${renderEventos(eventosAlerta)}
+          ${renderDistribuicao(estadoRows, presentes.length, 'bg-rose-500')}
         </div>
+      </div>
+
+      <div class="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+        <h3 class="text-xs font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4 flex items-center gap-2">
+          <i data-lucide="gauge" class="w-4 h-4 text-blue-600"></i> Engajamento (Resumo)
+        </h3>
+        ${renderDistribuicao(engajRows, presentes.length, 'bg-blue-500')}
       </div>
     `;
   }

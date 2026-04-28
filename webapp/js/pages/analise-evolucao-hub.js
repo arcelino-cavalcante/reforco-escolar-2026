@@ -19,31 +19,24 @@ function lazyTabRender(importer, exportName) {
 
 const TABS = [
   {
-    id: 'visao-geral',
-    label: 'Resumo',
-    icon: 'bar-chart-2',
-    hint: 'Resumo geral dos atendimentos e evolução.',
-    render: lazyTabRender(() => import('./analise-evolucao.js'), 'renderAnaliseEvolucao')
-  },
-  {
     id: 'frequencia-risco',
     label: 'Faltas',
     icon: 'shield-alert',
-    hint: 'Quem faltou e por qual motivo.',
+    hint: 'Presença, faltas e motivos principais.',
     render: lazyTabRender(() => import('./frequencia-risco.js'), 'renderFrequenciaRisco')
   },
   {
     id: 'gargalos-habilidade',
     label: 'Habilidades',
     icon: 'target',
-    hint: 'Habilidades com maior dificuldade.',
+    hint: 'Habilidades com mais dificuldade dos alunos.',
     render: lazyTabRender(() => import('./gargalos-habilidade.js'), 'renderGargalosHabilidade')
   },
   {
     id: 'socioemocional-engajamento',
-    label: 'Comportamento',
+    label: 'Participação',
     icon: 'heart-pulse',
-    hint: 'Estado emocional e participação dos alunos.',
+    hint: 'Estado emocional e engajamento em aula.',
     render: lazyTabRender(() => import('./socioemocional-engajamento.js'), 'renderSocioemocionalEngajamento')
   },
   {
@@ -61,7 +54,7 @@ export async function renderAnaliseEvolucaoHub(container, session) {
     return;
   }
 
-  let activeTab = 'visao-geral';
+  let activeTab = 'frequencia-risco';
   let renderToken = 0;
 
   renderShell();
@@ -72,7 +65,7 @@ export async function renderAnaliseEvolucaoHub(container, session) {
     container.innerHTML = `
       <div class="animate-fade-in">
         <div class="bg-white border-2 border-black p-3 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] mb-4">
-          <p class="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-2">Análises da Coordenação</p>
+          <p class="text-[10px] font-black uppercase tracking-wider text-gray-400 mb-2">Análises Principais da Coordenação</p>
           <div id="ae-tabs" class="flex gap-2 overflow-x-auto pb-1">
             ${TABS.map((t) => `
               <button data-tab="${t.id}" class="ae-tab-btn flex items-center gap-2 px-3 py-2 border-2 border-black font-black uppercase tracking-wider text-[10px] whitespace-nowrap transition-colors ${tabButtonClasses(t.id, t.id === activeTab)}">

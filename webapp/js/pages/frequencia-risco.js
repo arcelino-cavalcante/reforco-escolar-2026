@@ -172,6 +172,7 @@ export async function renderFrequenciaRisco(container, session) {
     const faltas = dados.filter((r) => !isPresent(r));
     const presencas = dados.length - faltas.length;
     const freqPct = dados.length > 0 ? Math.round((presencas / dados.length) * 100) : 0;
+    const alunosComFaltaSet = new Set(faltas.map((r) => String(r.estudante_id || '')));
 
     const motivoStats = {};
     faltas.forEach((r) => {
@@ -183,9 +184,6 @@ export async function renderFrequenciaRisco(container, session) {
       .sort((a, b) => b.qtd - a.qtd);
 
     const alunoMap = {};
-    const turmaMap = {};
-    const profMap = {};
-
     dados.forEach((r) => {
       const aId = String(r.estudante_id || 'sem_id');
       if (!alunoMap[aId]) {
@@ -199,20 +197,10 @@ export async function renderFrequenciaRisco(container, session) {
       }
       alunoMap[aId].total += 1;
 
-      const turmaNome = r.turma_nome || 'Sem turma';
-      if (!turmaMap[turmaNome]) turmaMap[turmaNome] = { nome: turmaNome, total: 0, faltas: 0 };
-      turmaMap[turmaNome].total += 1;
-
-      const profNome = r.prof_nome || 'Sem professor';
-      if (!profMap[profNome]) profMap[profNome] = { nome: profNome, total: 0, faltas: 0 };
-      profMap[profNome].total += 1;
-
       if (!isPresent(r)) {
         const mf = motivoFalha(r);
         alunoMap[aId].faltas += 1;
         alunoMap[aId].motivos[mf] = (alunoMap[aId].motivos[mf] || 0) + 1;
-        turmaMap[turmaNome].faltas += 1;
-        profMap[profNome].faltas += 1;
       }
     });
 
@@ -225,17 +213,7 @@ export async function renderFrequenciaRisco(container, session) {
       .filter((a) => a.faltas > 0)
       .sort((a, b) => (b.faltas - a.faltas) || (b.pctFalta - a.pctFalta));
 
-    const turmasRec = Object.values(turmaMap)
-      .filter((t) => t.faltas > 0)
-      .map((t) => ({ ...t, pctFalta: t.total > 0 ? Math.round((t.faltas / t.total) * 100) : 0 }))
-      .sort((a, b) => (b.faltas - a.faltas) || (b.pctFalta - a.pctFalta));
-
-    const profsRec = Object.values(profMap)
-      .filter((p) => p.faltas > 0)
-      .map((p) => ({ ...p, pctFalta: p.total > 0 ? Math.round((p.faltas / p.total) * 100) : 0 }))
-      .sort((a, b) => (b.faltas - a.faltas) || (b.pctFalta - a.pctFalta));
-
-    const alunosRisco = alunos.filter((a) => a.faltas >= 2 && a.pctFalta >= 30);
+    const alunosReincidentes = alunos.filter((a) => a.faltas >= 2);
     const faltasDetalhadas = faltas
       .map((r) => ({
         data: r.data_registro || '',
@@ -250,25 +228,26 @@ export async function renderFrequenciaRisco(container, session) {
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         ${metricCard('Registros no Período', dados.length, 'file-text', 'gray')}
         ${metricCard('Faltas', faltas.length, 'x-circle', 'red')}
-        ${metricCard('Frequência Geral', `${freqPct}%`, 'check-circle-2', 'green')}
-        ${metricCard('Alunos em Risco', alunosRisco.length, 'triangle-alert', 'amber')}
+        ${metricCard('Alunos Que Faltaram', alunosComFaltaSet.size, 'user-x', 'amber')}
+        ${metricCard('Reincidentes (2+ faltas)', alunosReincidentes.length, 'siren', 'blue')}
       </div>
-
-      <div class="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] mb-6">
-        <h3 class="text-xs font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4 flex items-center gap-2">
-          <i data-lucide="list-filter" class="w-4 h-4 text-red-600"></i> Quem Faltou e Por Qual Motivo
-        </h3>
-        ${renderTabelaFaltasDetalhadas(faltasDetalhadas)}
-      </div>
+      <p class="text-[10px] font-bold text-gray-500 mb-6">Frequência geral no período: <span class="text-black">${freqPct}%</span></p>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div class="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
           <h3 class="text-xs font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4 flex items-center gap-2">
-            <i data-lucide="alert-circle" class="w-4 h-4 text-red-600"></i> Faltas por Motivo
+            <i data-lucide="list-filter" class="w-4 h-4 text-red-600"></i> Quem Faltou e Motivo
+          </h3>
+          ${renderTabelaFaltasDetalhadas(faltasDetalhadas)}
+        </div>
+
+        <div class="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+          <h3 class="text-xs font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4 flex items-center gap-2">
+            <i data-lucide="alert-circle" class="w-4 h-4 text-red-600"></i> Resumo por Motivo
           </h3>
           ${motivosTop.length === 0 ? `<p class="text-xs font-bold text-gray-400">Sem faltas registradas no recorte.</p>` : `
             <div class="space-y-3">
-              ${motivosTop.map((m) => `
+              ${motivosTop.slice(0, 8).map((m) => `
                 <div>
                   <div class="flex justify-between text-[11px] font-bold mb-1">
                     <span class="text-gray-700">${esc(m.motivo)}</span>
@@ -282,29 +261,13 @@ export async function renderFrequenciaRisco(container, session) {
             </div>
           `}
         </div>
-
-        <div class="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-          <h3 class="text-xs font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4 flex items-center gap-2">
-            <i data-lucide="siren" class="w-4 h-4 text-amber-600"></i> Alunos com Maior Reincidência
-          </h3>
-          ${renderTabelaAlunos(alunos)}
-        </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-          <h3 class="text-xs font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4 flex items-center gap-2">
-            <i data-lucide="school" class="w-4 h-4 text-blue-600"></i> Reincidência por Turma
-          </h3>
-          ${renderTabelaRecorrencia(turmasRec, 'turma')}
-        </div>
-
-        <div class="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-          <h3 class="text-xs font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4 flex items-center gap-2">
-            <i data-lucide="book-user" class="w-4 h-4 text-purple-600"></i> Reincidência por Professor
-          </h3>
-          ${renderTabelaRecorrencia(profsRec, 'prof')}
-        </div>
+      <div class="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+        <h3 class="text-xs font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4 flex items-center gap-2">
+          <i data-lucide="siren" class="w-4 h-4 text-amber-600"></i> Alunos com Mais Faltas
+        </h3>
+        ${renderTabelaAlunos(alunos)}
       </div>
     `;
   }
@@ -331,24 +294,6 @@ function renderTabelaAlunos(alunos) {
   `;
 }
 
-function renderTabelaRecorrencia(rows, tipo) {
-  if (rows.length === 0) return `<p class="text-xs font-bold text-gray-400">Sem faltas registradas.</p>`;
-
-  return `
-    <div class="space-y-1.5 max-h-80 overflow-y-auto">
-      ${rows.slice(0, 20).map((r) => `
-        <div class="border border-black bg-gray-50 px-2 py-1.5 flex items-center justify-between gap-2">
-          <div class="min-w-0">
-            <p class="text-[11px] font-black truncate">${esc(r.nome)}</p>
-            <p class="text-[10px] font-bold text-gray-500">${r.faltas}/${r.total} faltas</p>
-          </div>
-          <span class="text-[10px] font-black px-1.5 py-0.5 border border-black ${r.pctFalta >= 40 ? 'bg-red-200 text-red-900' : 'bg-yellow-100 text-yellow-900'}">${r.pctFalta}%</span>
-        </div>
-      `).join('')}
-    </div>
-  `;
-}
-
 function renderTabelaFaltasDetalhadas(rows) {
   if (rows.length === 0) {
     return `<p class="text-xs font-bold text-gray-400">Sem faltas registradas no período selecionado.</p>`;
@@ -356,7 +301,7 @@ function renderTabelaFaltasDetalhadas(rows) {
 
   return `
     <div class="space-y-2 max-h-96 overflow-y-auto">
-      ${rows.slice(0, 60).map((r) => `
+      ${rows.slice(0, 40).map((r) => `
         <div class="border border-black bg-gray-50 p-2">
           <div class="flex items-center justify-between gap-2">
             <p class="text-[11px] font-black truncate">${esc(r.aluno)}</p>
@@ -367,6 +312,7 @@ function renderTabelaFaltasDetalhadas(rows) {
         </div>
       `).join('')}
     </div>
+    <p class="text-[10px] font-bold text-gray-500 mt-2">Mostrando até 40 faltas no detalhe.</p>
   `;
 }
 

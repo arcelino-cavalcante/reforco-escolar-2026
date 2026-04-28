@@ -246,45 +246,38 @@ export async function renderGargalosHabilidade(container, session) {
         dif: c.dif
       }))
       .sort((a, b) => (b.data || '').localeCompare(a.data || '') || (a.aluno || '').localeCompare(b.aluno || ''));
+    const alunosComDificuldadeUnicos = new Set(alunosComDificuldade.map((r) => `${r.aluno}|${r.turma}`)).size;
 
     casosCriticos.sort((a, b) => (b.data || '').localeCompare(a.data || ''));
 
     return `
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         ${metricCard('Registros Válidos', validos.length, 'file-check-2', 'gray')}
-        ${metricCard('Habilidades Únicas', habRows.length, 'list-checks', 'blue')}
         ${metricCard('Habilidades Críticas', qtdCriticas, 'triangle-alert', 'red')}
-        ${metricCard('Com Dificuldade Latente', qtdComDif, 'siren', 'amber')}
+        ${metricCard('Alunos com Dificuldade', alunosComDificuldadeUnicos, 'users-round', 'amber')}
+        ${metricCard('Dificuldades Latentes', qtdComDif, 'message-square-warning', 'blue')}
       </div>
+      <p class="text-[10px] font-bold text-gray-500 mb-6">Foco do mês: priorizar as habilidades críticas e os alunos com dificuldade recorrente.</p>
 
       <div class="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] mb-6">
         <h3 class="text-xs font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4 flex items-center gap-2">
-          <i data-lucide="list-todo" class="w-4 h-4 text-red-600"></i> Alunos com Dificuldade (Lista Direta)
+          <i data-lucide="list-todo" class="w-4 h-4 text-red-600"></i> Prioridade de Alunos (Quem precisa de reforço agora)
         </h3>
         ${renderListaAlunosDificuldade(alunosComDificuldade)}
       </div>
 
       <div class="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] mb-6">
         <h3 class="text-xs font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4 flex items-center gap-2">
-          <i data-lucide="target" class="w-4 h-4 text-red-600"></i> Ranking de Gargalos por Habilidade
+          <i data-lucide="target" class="w-4 h-4 text-red-600"></i> Habilidades Prioritárias
         </h3>
-        ${renderTabelaHabilidades(habRows)}
+        ${renderTabelaHabilidades(habRows.slice(0, 12))}
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-          <h3 class="text-xs font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4 flex items-center gap-2">
-            <i data-lucide="message-square-warning" class="w-4 h-4 text-amber-600"></i> Dificuldades Latentes Mais Citadas
-          </h3>
-          ${renderTabelaDificuldades(difRows)}
-        </div>
-
-        <div class="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-          <h3 class="text-xs font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4 flex items-center gap-2">
-            <i data-lucide="history" class="w-4 h-4 text-purple-600"></i> Casos Críticos Recentes
-          </h3>
-          ${renderTabelaCasos(casosCriticos)}
-        </div>
+      <div class="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+        <h3 class="text-xs font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4 flex items-center gap-2">
+          <i data-lucide="message-square-warning" class="w-4 h-4 text-amber-600"></i> Dificuldades Mais Citadas
+        </h3>
+        ${renderTabelaDificuldades(difRows.slice(0, 10))}
       </div>
     `;
   }

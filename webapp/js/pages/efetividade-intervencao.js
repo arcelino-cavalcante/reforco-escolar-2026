@@ -168,22 +168,19 @@ export async function renderEfetividadeIntervencao(container, session) {
 
     const tipoStats = agregaCategoria(presentes, (r) => r.tipo_atividade, 'Não informado');
     const origemStats = agregaCategoria(presentes, (r) => r.origem_conteudo, 'Não informado');
-    const comboStats = agregaCategoria(presentes, (r) => `${limpa(r.tipo_atividade, 'Não informado')} + ${limpa(r.origem_conteudo, 'Não informado')}`, 'Não informado');
-
     const ganhoGeral = calculaGanhoMedio(presentes);
-    const notasValidas = presentes.map((r) => compreensaoParaNota(r.nivel_compreensao ?? 0)).filter((n) => n > 0);
-    const mediaComp = notasValidas.length > 0 ? (notasValidas.reduce((a, b) => a + b, 0) / notasValidas.length) : 0;
-    const tiposComGanhoNegativo = tipoStats.filter((t) => t.ganhoMedio < 0).length;
     const progressoAlunos = calculaProgressoPorAluno(presentes);
     const alunosSemEvolucao = progressoAlunos.filter((a) => a.ganho !== null && a.ganho <= 0).length;
+    const tiposPositivos = tipoStats.filter((t) => t.ganhoMedio > 0).length;
 
     return `
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         ${metricCard('Presenças Analisadas', presentes.length, 'user-check', 'green')}
-        ${metricCard('Média Compreensão', `${mediaComp.toFixed(1)}/4`, 'bar-chart-2', 'blue')}
         ${metricCard('Ganho Médio (Período)', formatSigned(ganhoGeral), 'trending-up', ganhoGeral >= 0 ? 'emerald' : 'red')}
         ${metricCard('Alunos sem Evolução', alunosSemEvolucao, 'triangle-alert', alunosSemEvolucao > 0 ? 'amber' : 'gray')}
+        ${metricCard('Tipos com Ganho Positivo', tiposPositivos, 'thumbs-up', 'blue')}
       </div>
+      <p class="text-[10px] font-bold text-gray-500 mb-6">Priorize as atividades e origens com ganho positivo e revise os alunos sem evolução.</p>
 
       <div class="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] mb-6">
         <h3 class="text-xs font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4 flex items-center gap-2">
@@ -195,25 +192,17 @@ export async function renderEfetividadeIntervencao(container, session) {
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div class="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
           <h3 class="text-xs font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4 flex items-center gap-2">
-            <i data-lucide="puzzle" class="w-4 h-4 text-blue-600"></i> Efetividade por Tipo de Atividade
+            <i data-lucide="puzzle" class="w-4 h-4 text-blue-600"></i> Atividades Mais Eficientes
           </h3>
-          ${renderTabelaEfetividade(tipoStats)}
+          ${renderTabelaEfetividade(tipoStats.slice(0, 10))}
         </div>
 
         <div class="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
           <h3 class="text-xs font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4 flex items-center gap-2">
-            <i data-lucide="book-open-check" class="w-4 h-4 text-purple-600"></i> Efetividade por Origem do Conteúdo
+            <i data-lucide="book-open-check" class="w-4 h-4 text-purple-600"></i> Origem de Conteúdo Mais Eficiente
           </h3>
-          ${renderTabelaEfetividade(origemStats)}
+          ${renderTabelaEfetividade(origemStats.slice(0, 10))}
         </div>
-      </div>
-
-      <div class="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-        <h3 class="text-xs font-black uppercase tracking-wider border-b-2 border-black pb-2 mb-4 flex items-center gap-2">
-          <i data-lucide="split-square-vertical" class="w-4 h-4 text-amber-600"></i> Combinações Tipo + Origem (Top 15)
-        </h3>
-        ${renderTabelaEfetividade(comboStats.slice(0, 15))}
-        <p class="text-[10px] font-bold text-gray-500 mt-3">Categorias com ganho negativo: <b>${tiposComGanhoNegativo}</b></p>
       </div>
     `;
   }
